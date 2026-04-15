@@ -13,6 +13,7 @@ class Asset extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     this.latestSnapshot,
+    this.previousSnapshot,
   });
 
   final String id;
@@ -25,6 +26,7 @@ class Asset extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   final LatestSnapshot? latestSnapshot;
+  final LatestSnapshot? previousSnapshot;
 
   Asset copyWith({
     String? name,
@@ -35,6 +37,7 @@ class Asset extends Equatable {
     bool? isArchived,
     DateTime? updatedAt,
     LatestSnapshot? latestSnapshot,
+    LatestSnapshot? previousSnapshot,
   }) {
     return Asset(
       id: id,
@@ -47,14 +50,24 @@ class Asset extends Equatable {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       latestSnapshot: latestSnapshot ?? this.latestSnapshot,
+      previousSnapshot: previousSnapshot ?? this.previousSnapshot,
     );
   }
 
   @override
   List<Object?> get props => [
-        id, name, type, currency, color, description,
-        isArchived, createdAt, updatedAt, latestSnapshot,
-      ];
+    id,
+    name,
+    type,
+    currency,
+    color,
+    description,
+    isArchived,
+    createdAt,
+    updatedAt,
+    latestSnapshot,
+    previousSnapshot,
+  ];
 }
 
 class LatestSnapshot extends Equatable {

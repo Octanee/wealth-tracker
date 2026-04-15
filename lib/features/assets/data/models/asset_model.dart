@@ -14,6 +14,7 @@ class AssetModel {
     required this.createdAt,
     required this.updatedAt,
     this.latestSnapshot,
+    this.previousSnapshot,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class AssetModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final LatestSnapshotModel? latestSnapshot;
+  final LatestSnapshotModel? previousSnapshot;
 
   factory AssetModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -41,35 +43,43 @@ class AssetModel {
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
       latestSnapshot: data['latestSnapshot'] != null
           ? LatestSnapshotModel.fromMap(
-              data['latestSnapshot'] as Map<String, dynamic>)
+              data['latestSnapshot'] as Map<String, dynamic>,
+            )
+          : null,
+      previousSnapshot: data['previousSnapshot'] != null
+          ? LatestSnapshotModel.fromMap(
+              data['previousSnapshot'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
 
   Map<String, dynamic> toFirestore() => {
-        'name': name,
-        'type': type,
-        'currency': currency,
-        'color': color,
-        if (description != null) 'description': description,
-        'isArchived': isArchived,
-        'createdAt': Timestamp.fromDate(createdAt),
-        'updatedAt': Timestamp.fromDate(updatedAt),
-        'latestSnapshot': latestSnapshot?.toMap(),
-      };
+    'name': name,
+    'type': type,
+    'currency': currency,
+    'color': color,
+    if (description != null) 'description': description,
+    'isArchived': isArchived,
+    'createdAt': Timestamp.fromDate(createdAt),
+    'updatedAt': Timestamp.fromDate(updatedAt),
+    'latestSnapshot': latestSnapshot?.toMap(),
+    'previousSnapshot': previousSnapshot?.toMap(),
+  };
 
   Asset toDomain() => Asset(
-        id: id,
-        name: name,
-        type: AssetType.fromString(type),
-        currency: currency,
-        color: color,
-        description: description,
-        isArchived: isArchived,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-        latestSnapshot: latestSnapshot?.toDomain(),
-      );
+    id: id,
+    name: name,
+    type: AssetType.fromString(type),
+    currency: currency,
+    color: color,
+    description: description,
+    isArchived: isArchived,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    latestSnapshot: latestSnapshot?.toDomain(),
+    previousSnapshot: previousSnapshot?.toDomain(),
+  );
 }
 
 class LatestSnapshotModel {
@@ -92,14 +102,11 @@ class LatestSnapshotModel {
   }
 
   Map<String, dynamic> toMap() => {
-        'value': value,
-        'recordedAt': Timestamp.fromDate(recordedAt),
-        'entryId': entryId,
-      };
+    'value': value,
+    'recordedAt': Timestamp.fromDate(recordedAt),
+    'entryId': entryId,
+  };
 
-  LatestSnapshot toDomain() => LatestSnapshot(
-        value: value,
-        recordedAt: recordedAt,
-        entryId: entryId,
-      );
+  LatestSnapshot toDomain() =>
+      LatestSnapshot(value: value, recordedAt: recordedAt, entryId: entryId);
 }

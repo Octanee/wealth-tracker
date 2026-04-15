@@ -30,7 +30,9 @@ service cloud.firestore {
             && request.resource.data.keys().hasAll(['value', 'recordedAt', 'createdAt'])
             && request.resource.data.value is number
             && request.resource.data.value >= 0;
-          allow update: if false; // entries are immutable
+          allow update: if isOwner(userId)
+            && request.resource.data.value is number
+            && request.resource.data.value >= 0;
           allow delete: if isOwner(userId);
         }
       }

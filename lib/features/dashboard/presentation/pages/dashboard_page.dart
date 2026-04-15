@@ -10,6 +10,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
 import '../../../../features/auth/presentation/cubit/auth_state.dart';
+import '../../../../shared/widgets/trend_badge.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -45,42 +46,73 @@ class _DashboardPageState extends State<DashboardPage> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Witaj, $name 👋',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                Text(DateFormatter.dateOnly(DateTime.now()),
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                Text(
+                  'Witaj, $name 👋',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  DateFormatter.dateOnly(DateTime.now()),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             );
           },
         ),
       ),
-      body: BlocBuilder<DashboardCubit, DashboardState>(
-        builder: (context, state) {
-          if (state is DashboardLoading || state is DashboardInitial) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      body: BlocListener<AuthCubit, AuthState>(
+        listenWhen: (previous, current) =>
+            previous is! AuthAuthenticated && current is AuthAuthenticated,
+        listener: (context, state) {
+          if (state is AuthAuthenticated) {
+            context.read<DashboardCubit>().loadDashboard(state.user.uid);
           }
-          if (state is DashboardError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, color: AppColors.negative, size: 48),
-                    const SizedBox(height: 16),
-                    SelectableText(state.message, style: const TextStyle(color: AppColors.textSecondary)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _load, child: const Text('Odśwież')),
-                  ],
-                ),
-              ),
-            );
-          }
-          if (state is DashboardLoaded) {
-            return _DashboardContent(state: state);
-          }
-          return const SizedBox.shrink();
         },
+        child: BlocBuilder<DashboardCubit, DashboardState>(
+          builder: (context, state) {
+            if (state is DashboardLoading || state is DashboardInitial) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
+            if (state is DashboardError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.negative,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 16),
+                      SelectableText(
+                        state.message,
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _load,
+                        child: const Text('Odśwież'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            if (state is DashboardLoaded) {
+              return _DashboardContent(state: state);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ),
     );
   }
@@ -105,7 +137,9 @@ class _DashboardContent extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height - 200),
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height - 200,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -148,8 +182,14 @@ class _TotalWealthSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Łączny majątek',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
+          const Text(
+            'Łączny majątek',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 16),
           ...totalByCurrency.entries.map(
             (e) => Padding(
@@ -177,8 +217,14 @@ class _TotalWealthSection extends StatelessWidget {
               children: [
                 Icon(Icons.show_chart, color: AppColors.positive, size: 14),
                 SizedBox(width: 4),
-                Text('Portfel aktywny',
-                    style: TextStyle(color: AppColors.positive, fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(
+                  'Portfel aktywny',
+                  style: TextStyle(
+                    color: AppColors.positive,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -205,12 +251,20 @@ class _EmptyDashboard extends StatelessWidget {
             child: const Icon(Icons.show_chart, color: Colors.white, size: 48),
           ),
           const SizedBox(height: 16),
-          const Text('Zacznij śledzić majątek',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
+          const Text(
+            'Zacznij śledzić majątek',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Przejdź do zakładki Aktywa i dodaj swoje pierwsze aktywo.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-              textAlign: TextAlign.center),
+          const Text(
+            'Przejdź do zakładki Aktywa i dodaj swoje pierwsze aktywo.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => context.go('/assets'),
@@ -238,22 +292,37 @@ class _AllocationSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Alokacja portfela',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+          const Text(
+            'Alokacja portfela',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
               SizedBox(
                 width: 120,
                 height: 120,
-                child: _DonutChart(assets: state.assetsWithValue, percents: state.allocationPercents),
+                child: _DonutChart(
+                  assets: state.assetsWithValue,
+                  percents: state.allocationPercents,
+                ),
               ),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
-                  children: state.assetsWithValue.take(6).map(
-                    (asset) => _LegendItem(asset: asset, percent: state.allocationPercents[asset.id] ?? 0),
-                  ).toList(),
+                  children: state.assetsWithValue
+                      .take(6)
+                      .map(
+                        (asset) => _LegendItem(
+                          asset: asset,
+                          percent: state.allocationPercents[asset.id] ?? 0,
+                        ),
+                      )
+                      .toList(),
                 ),
               ),
             ],
@@ -271,8 +340,12 @@ class _LegendItem extends StatelessWidget {
 
   Color get _color {
     const colors = [
-      AppColors.assetBank, AppColors.assetBroker, AppColors.assetCrypto,
-      AppColors.assetMetal, AppColors.assetCash, AppColors.assetOther,
+      AppColors.assetBank,
+      AppColors.assetBroker,
+      AppColors.assetCrypto,
+      AppColors.assetMetal,
+      AppColors.assetCash,
+      AppColors.assetOther,
     ];
     return colors[asset.type.index % colors.length];
   }
@@ -284,17 +357,33 @@ class _LegendItem extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 10, height: 10,
-            decoration: BoxDecoration(color: _color, borderRadius: BorderRadius.circular(3)),
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: _color,
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(asset.name,
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            child: Text(
+              asset.name,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          Text('${percent.toStringAsFixed(1)}%',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            '${percent.toStringAsFixed(1)}%',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -308,7 +397,9 @@ class _DonutChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: _DonutPainter(assets: assets, percents: percents));
+    return CustomPaint(
+      painter: _DonutPainter(assets: assets, percents: percents),
+    );
   }
 }
 
@@ -318,8 +409,12 @@ class _DonutPainter extends CustomPainter {
   final Map<String, double> percents;
 
   static const _colors = [
-    AppColors.assetBank, AppColors.assetBroker, AppColors.assetCrypto,
-    AppColors.assetMetal, AppColors.assetCash, AppColors.assetOther,
+    AppColors.assetBank,
+    AppColors.assetBroker,
+    AppColors.assetCrypto,
+    AppColors.assetMetal,
+    AppColors.assetCash,
+    AppColors.assetOther,
   ];
 
   @override
@@ -344,7 +439,10 @@ class _DonutPainter extends CustomPainter {
       paint.color = _colors[asset.type.index % _colors.length];
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
-        startAngle + 0.05, sweep - 0.1, false, paint,
+        startAngle + 0.05,
+        sweep - 0.1,
+        false,
+        paint,
       );
       startAngle += sweep;
     }
@@ -367,22 +465,32 @@ class _AssetsSummarySection extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Twoje aktywa',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
+            const Text(
+              'Twoje aktywa',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             TextButton(
               onPressed: () => context.go('/assets'),
-              child: const Text('Zobacz wszystkie',
-                  style: TextStyle(color: AppColors.primary, fontSize: 13)),
+              child: const Text(
+                'Zobacz wszystkie',
+                style: TextStyle(color: AppColors.primary, fontSize: 13),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        ...state.assets.take(5).map(
-          (asset) => _DashboardAssetRow(
-            asset: asset,
-            onTap: () => context.go('/assets/${asset.id}', extra: asset),
-          ),
-        ),
+        ...state.assets
+            .take(5)
+            .map(
+              (asset) => _DashboardAssetRow(
+                asset: asset,
+                onTap: () => context.go('/assets/${asset.id}', extra: asset),
+              ),
+            ),
       ],
     );
   }
@@ -395,18 +503,32 @@ class _DashboardAssetRow extends StatelessWidget {
 
   Color get _typeColor {
     switch (asset.type) {
-      case AssetType.bank:   return AppColors.assetBank;
-      case AssetType.broker: return AppColors.assetBroker;
-      case AssetType.crypto: return AppColors.assetCrypto;
-      case AssetType.metal:  return AppColors.assetMetal;
-      case AssetType.cash:   return AppColors.assetCash;
-      case AssetType.other:  return AppColors.assetOther;
+      case AssetType.bank:
+        return AppColors.assetBank;
+      case AssetType.broker:
+        return AppColors.assetBroker;
+      case AssetType.crypto:
+        return AppColors.assetCrypto;
+      case AssetType.metal:
+        return AppColors.assetMetal;
+      case AssetType.cash:
+        return AppColors.assetCash;
+      case AssetType.other:
+        return AppColors.assetOther;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final snapshot = asset.latestSnapshot;
+    final previousSnapshot = asset.previousSnapshot;
+    final hasTrend = snapshot != null && previousSnapshot != null;
+    final previousValue = previousSnapshot?.value ?? 0.0;
+    final change = hasTrend ? snapshot.value - previousSnapshot.value : 0.0;
+    final percent = hasTrend && previousValue != 0
+        ? (change / previousValue) * 100
+        : 0.0;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -415,30 +537,75 @@ class _DashboardAssetRow extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(color: _typeColor.withAlpha(30), borderRadius: BorderRadius.circular(10)),
-              child: Center(child: Text(asset.type.icon, style: const TextStyle(fontSize: 18))),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _typeColor.withAlpha(30),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  asset.type.icon,
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(asset.name,
-                      style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text(asset.type.displayName,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  Text(
+                    asset.name,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        asset.type.displayName,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                      if (hasTrend) ...[
+                        const SizedBox(width: 8),
+                        TrendBadge(
+                          delta: change,
+                          percent: percent,
+                          currency: asset.currency,
+                          compact: true,
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
             if (snapshot != null)
-              Text(CurrencyFormatter.formatCompact(snapshot.value, asset.currency),
-                  style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 15))
+              Text(
+                CurrencyFormatter.formatCompact(snapshot.value, asset.currency),
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              )
             else
               const Text('—', style: TextStyle(color: AppColors.textMuted)),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 16),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textMuted,
+              size: 16,
+            ),
           ],
         ),
       ),

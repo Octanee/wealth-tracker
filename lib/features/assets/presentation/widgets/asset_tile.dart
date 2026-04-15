@@ -4,6 +4,7 @@ import '../../domain/entities/asset_type.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../shared/widgets/trend_badge.dart';
 import 'asset_type_badge.dart';
 
 class AssetTile extends StatelessWidget {
@@ -14,19 +15,32 @@ class AssetTile extends StatelessWidget {
 
   Color get _typeColor {
     switch (asset.type) {
-      case AssetType.bank:   return AppColors.assetBank;
-      case AssetType.broker: return AppColors.assetBroker;
-      case AssetType.crypto: return AppColors.assetCrypto;
-      case AssetType.metal:  return AppColors.assetMetal;
-      case AssetType.cash:   return AppColors.assetCash;
-      case AssetType.other:  return AppColors.assetOther;
+      case AssetType.bank:
+        return AppColors.assetBank;
+      case AssetType.broker:
+        return AppColors.assetBroker;
+      case AssetType.crypto:
+        return AppColors.assetCrypto;
+      case AssetType.metal:
+        return AppColors.assetMetal;
+      case AssetType.cash:
+        return AppColors.assetCash;
+      case AssetType.other:
+        return AppColors.assetOther;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final snapshot = asset.latestSnapshot;
+    final previousSnapshot = asset.previousSnapshot;
     final hasValue = snapshot != null;
+    final hasTrend = snapshot != null && previousSnapshot != null;
+    final previousValue = previousSnapshot?.value ?? 0.0;
+    final change = hasTrend ? snapshot.value - previousSnapshot.value : 0.0;
+    final percent = hasTrend && previousValue != 0
+        ? (change / previousValue) * 100
+        : 0.0;
 
     return Material(
       color: Colors.transparent,
@@ -80,7 +94,9 @@ class AssetTile extends StatelessWidget {
                         Text(
                           asset.currency,
                           style: const TextStyle(
-                              color: AppColors.textMuted, fontSize: 12),
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -93,7 +109,10 @@ class AssetTile extends StatelessWidget {
                 children: [
                   Text(
                     hasValue
-                        ? CurrencyFormatter.formatCompact(snapshot.value, asset.currency)
+                        ? CurrencyFormatter.formatCompact(
+                            snapshot.value,
+                            asset.currency,
+                          )
                         : '—',
                     style: const TextStyle(
                       color: AppColors.textPrimary,
@@ -105,17 +124,35 @@ class AssetTile extends StatelessWidget {
                     Text(
                       DateFormatter.relative(snapshot.recordedAt),
                       style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 12),
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
                     )
                   else
                     const Text(
                       'Brak wpisów',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
                     ),
+                  if (hasTrend) ...[
+                    const SizedBox(height: 6),
+                    TrendBadge(
+                      delta: change,
+                      percent: percent,
+                      currency: asset.currency,
+                      compact: true,
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 18),
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.textMuted,
+                size: 18,
+              ),
             ],
           ),
         ),

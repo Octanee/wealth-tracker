@@ -29,16 +29,28 @@ class WealthLensApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => AuthCubit(authRepository: sl.authRepository),
+          create: (_) => AuthCubit(
+            authRepository: sl.authRepository,
+            analytics: sl.analyticsService,
+          ),
         ),
         BlocProvider(
-          create: (_) => AssetsCubit(repository: sl.assetsRepository),
+          create: (_) => AssetsCubit(
+            repository: sl.assetsRepository,
+            analytics: sl.analyticsService,
+          ),
         ),
         BlocProvider(
-          create: (_) => DashboardCubit(repository: sl.assetsRepository),
+          create: (_) => DashboardCubit(
+            repository: sl.assetsRepository,
+            analytics: sl.analyticsService,
+          ),
         ),
         BlocProvider(
-          create: (_) => SettingsCubit(authRepository: sl.authRepository),
+          create: (_) => SettingsCubit(
+            authRepository: sl.authRepository,
+            analytics: sl.analyticsService,
+          ),
         ),
       ],
       child: Builder(

@@ -25,6 +25,7 @@ class AssetDetailPage extends StatelessWidget {
       create: (context) {
         final cubit = AssetDetailCubit(
           repository: ServiceLocator.instance.assetsRepository,
+          analytics: ServiceLocator.instance.analyticsService,
         );
         final authState = context.read<AuthCubit>().state;
         if (authState is AuthAuthenticated) {
@@ -50,7 +51,10 @@ class _AssetDetailView extends StatelessWidget {
         actions: [
           BlocBuilder<AssetDetailCubit, AssetDetailState>(
             builder: (context, state) => IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: AppColors.primary,
+              ),
               tooltip: 'Dodaj wpis',
               onPressed: () => _showAddEntry(context),
             ),
@@ -60,13 +64,25 @@ class _AssetDetailView extends StatelessWidget {
       body: BlocBuilder<AssetDetailCubit, AssetDetailState>(
         builder: (context, state) {
           if (state is AssetDetailLoading || state is AssetDetailInitial) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
           if (state is AssetDetailError) {
-            return Center(child: Text(state.message, style: const TextStyle(color: AppColors.negative)));
+            return Center(
+              child: Text(
+                state.message,
+                style: const TextStyle(color: AppColors.negative),
+              ),
+            );
           }
           if (state is AssetDetailLoaded) {
-            return _LoadedView(state: state, asset: asset, onAddEntry: () => _showAddEntry(context));
+            return _LoadedView(
+              state: state,
+              asset: asset,
+              onAddEntry: () => _showAddEntry(context),
+              onEditEntry: (entry) => _showEditEntry(context, entry),
+            );
           }
           return const SizedBox.shrink();
         },
@@ -84,25 +100,56 @@ class _AssetDetailView extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _showEditEntry(BuildContext context, AssetEntry entry) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider.value(
+        value: context.read<AssetDetailCubit>(),
+        child: AddEntrySheet(
+          currency: asset.currency,
+          initialEntry: entry,
+          lockDate: true,
+        ),
+      ),
+    );
+  }
 }
 
 class _LoadedView extends StatelessWidget {
-  const _LoadedView({required this.state, required this.asset, required this.onAddEntry});
+  const _LoadedView({
+    required this.state,
+    required this.asset,
+    required this.onAddEntry,
+    required this.onEditEntry,
+  });
   final AssetDetailLoaded state;
   final Asset asset;
   final VoidCallback onAddEntry;
+  final ValueChanged<AssetEntry> onEditEntry;
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _HeaderCard(state: state, asset: asset)),
+        SliverToBoxAdapter(
+          child: _HeaderCard(state: state, asset: asset),
+        ),
         if (state.entries.isNotEmpty) ...[
-          SliverToBoxAdapter(child: _ChartSection(entries: state.entries, currency: asset.currency)),
+          SliverToBoxAdapter(
+            child: _ChartSection(
+              entries: state.entries,
+              currency: asset.currency,
+            ),
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Text('Historia wpisów', style: Theme.of(context).textTheme.titleLarge),
+              child: Text(
+                'Historia wpisów',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
           ),
           SliverList(
@@ -110,7 +157,10 @@ class _LoadedView extends StatelessWidget {
               (context, index) => _EntryTile(
                 entry: state.entries[index],
                 currency: asset.currency,
-                onDelete: () => context.read<AssetDetailCubit>().deleteEntry(state.entries[index].id),
+                onDelete: () => context.read<AssetDetailCubit>().deleteEntry(
+                  state.entries[index].id,
+                ),
+                onEdit: () => onEditEntry(state.entries[index]),
               ),
               childCount: state.entries.length,
             ),
@@ -118,9 +168,7 @@ class _LoadedView extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
         if (state.entries.isEmpty)
-          SliverFillRemaining(
-            child: _EmptyEntries(onAdd: onAddEntry),
-          ),
+          SliverFillRemaining(child: _EmptyEntries(onAdd: onAddEntry)),
       ],
     );
   }
@@ -153,7 +201,10 @@ class _HeaderCard extends StatelessWidget {
               const Spacer(),
               Text(
                 asset.currency,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
@@ -180,7 +231,10 @@ class _HeaderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  CurrencyFormatter.formatChange(state.changeAbsolute!, asset.currency),
+                  CurrencyFormatter.formatChange(
+                    state.changeAbsolute!,
+                    asset.currency,
+                  ),
                   style: TextStyle(
                     color: isPositive ? AppColors.positive : AppColors.negative,
                     fontWeight: FontWeight.w600,
@@ -198,7 +252,10 @@ class _HeaderCard extends StatelessWidget {
                 const Spacer(),
                 Text(
                   'vs poprzedni wpis',
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -241,12 +298,21 @@ class _ChartSection extends StatelessWidget {
         children: [
           const Text(
             'Historia wartości',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 16),
           SizedBox(
             height: 160,
-            child: _SimpleLineChart(points: points, minVal: minVal, maxVal: maxVal, currency: currency),
+            child: _SimpleLineChart(
+              points: points,
+              minVal: minVal,
+              maxVal: maxVal,
+              currency: currency,
+            ),
           ),
         ],
       ),
@@ -255,7 +321,12 @@ class _ChartSection extends StatelessWidget {
 }
 
 class _SimpleLineChart extends StatelessWidget {
-  const _SimpleLineChart({required this.points, required this.minVal, required this.maxVal, required this.currency});
+  const _SimpleLineChart({
+    required this.points,
+    required this.minVal,
+    required this.maxVal,
+    required this.currency,
+  });
   final List<ChartPoint> points;
   final double minVal;
   final double maxVal;
@@ -264,14 +335,22 @@ class _SimpleLineChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _LineChartPainter(points: points, minVal: minVal, maxVal: maxVal),
+      painter: _LineChartPainter(
+        points: points,
+        minVal: minVal,
+        maxVal: maxVal,
+      ),
       child: Container(),
     );
   }
 }
 
 class _LineChartPainter extends CustomPainter {
-  const _LineChartPainter({required this.points, required this.minVal, required this.maxVal});
+  const _LineChartPainter({
+    required this.points,
+    required this.minVal,
+    required this.maxVal,
+  });
   final List<ChartPoint> points;
   final double minVal;
   final double maxVal;
@@ -287,7 +366,10 @@ class _LineChartPainter extends CustomPainter {
 
     Offset _toOffset(int index, double value) {
       final x = points.length == 1 ? size.width / 2 : index * xStep;
-      final y = size.height - ((value - minVal) / effectiveRange) * size.height * 0.85 - size.height * 0.075;
+      final y =
+          size.height -
+          ((value - minVal) / effectiveRange) * size.height * 0.85 -
+          size.height * 0.075;
       return Offset(x, y);
     }
 
@@ -295,7 +377,10 @@ class _LineChartPainter extends CustomPainter {
     final fillPath = Path();
     fillPath.moveTo(0, size.height);
     for (int i = 0; i < points.length; i++) {
-      fillPath.lineTo(_toOffset(i, points[i].value).dx, _toOffset(i, points[i].value).dy);
+      fillPath.lineTo(
+        _toOffset(i, points[i].value).dx,
+        _toOffset(i, points[i].value).dy,
+      );
     }
     fillPath.lineTo(size.width, size.height);
     fillPath.close();
@@ -304,7 +389,10 @@ class _LineChartPainter extends CustomPainter {
       fillPath,
       Paint()
         ..shader = LinearGradient(
-          colors: [AppColors.primary.withAlpha(80), AppColors.primary.withAlpha(0)],
+          colors: [
+            AppColors.primary.withAlpha(80),
+            AppColors.primary.withAlpha(0),
+          ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
@@ -321,8 +409,10 @@ class _LineChartPainter extends CustomPainter {
     final path = Path();
     for (int i = 0; i < points.length; i++) {
       final offset = _toOffset(i, points[i].value);
-      if (i == 0) path.moveTo(offset.dx, offset.dy);
-      else path.lineTo(offset.dx, offset.dy);
+      if (i == 0)
+        path.moveTo(offset.dx, offset.dy);
+      else
+        path.lineTo(offset.dx, offset.dy);
     }
     canvas.drawPath(path, linePaint);
 
@@ -338,10 +428,16 @@ class _LineChartPainter extends CustomPainter {
 }
 
 class _EntryTile extends StatelessWidget {
-  const _EntryTile({required this.entry, required this.currency, required this.onDelete});
+  const _EntryTile({
+    required this.entry,
+    required this.currency,
+    required this.onDelete,
+    required this.onEdit,
+  });
   final AssetEntry entry;
   final String currency;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -354,45 +450,93 @@ class _EntryTile extends StatelessWidget {
         padding: const EdgeInsets.only(right: 20),
         child: const Icon(Icons.delete_outline, color: AppColors.negative),
       ),
+      confirmDismiss: (_) async => _confirmDelete(context),
       onDismissed: (_) => onDelete(),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    DateFormatter.dateOnly(entry.recordedAt),
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  ),
-                  if (entry.note != null && entry.note!.isNotEmpty)
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      entry.note!,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      DateFormatter.dateOnly(entry.recordedAt),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
-                ],
+                    if (entry.note != null && entry.note!.isNotEmpty)
+                      Text(
+                        entry.note!,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              CurrencyFormatter.format(entry.value, currency),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
+              Text(
+                CurrencyFormatter.format(entry.value, currency),
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
-            ),
-          ],
+              IconButton(
+                tooltip: 'Usuń wpis',
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: AppColors.negative,
+                  size: 20,
+                ),
+                onPressed: () async {
+                  final confirmed = await _confirmDelete(context);
+                  if (confirmed == true) {
+                    onDelete();
+                  }
+                },
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Future<bool?> _confirmDelete(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Usuń wpis?'),
+        content: const Text('Tej operacji nie można cofnąć.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Anuluj'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Usuń',
+              style: TextStyle(color: AppColors.negative),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -410,13 +554,25 @@ class _EmptyEntries extends StatelessWidget {
         children: [
           const Icon(Icons.history, color: AppColors.textMuted, size: 48),
           const SizedBox(height: 16),
-          const Text('Brak wpisów wartości',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+          const Text(
+            'Brak wpisów wartości',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Dodaj pierwszy wpis, aby rozpocząć śledzenie.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+          const Text(
+            'Dodaj pierwszy wpis, aby rozpocząć śledzenie.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(onPressed: onAdd, icon: const Icon(Icons.add), label: const Text('Dodaj wpis')),
+          ElevatedButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add),
+            label: const Text('Dodaj wpis'),
+          ),
         ],
       ),
     );

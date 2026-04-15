@@ -9,7 +9,7 @@ import '../models/asset_entry_model.dart';
 
 class AssetsRepositoryImpl implements AssetsRepository {
   AssetsRepositoryImpl({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+    : _firestore = firestore;
 
   final FirebaseFirestore _firestore;
   final _uuid = const Uuid();
@@ -20,14 +20,56 @@ class AssetsRepositoryImpl implements AssetsRepository {
   CollectionReference _entriesCol(String userId, String assetId) =>
       _assetsCol(userId).doc(assetId).collection('entries');
 
+  Future<void> _recalculateSnapshots(String userId, String assetId) async {
+    final snap = await _entriesCol(
+      userId,
+      assetId,
+    ).orderBy('recordedAt', descending: true).limit(2).get();
+
+    if (snap.docs.isEmpty) {
+      await _assetsCol(userId).doc(assetId).update({
+        'latestSnapshot': null,
+        'previousSnapshot': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    final latest = snap.docs.first;
+    final latestData = latest.data() as Map<String, dynamic>;
+    Map<String, dynamic>? previousSnapshot;
+    if (snap.docs.length > 1) {
+      final previous = snap.docs[1];
+      final previousData = previous.data() as Map<String, dynamic>;
+      previousSnapshot = {
+        'value': previousData['value'],
+        'recordedAt': previousData['recordedAt'],
+        'entryId': previous.id,
+      };
+    }
+
+    await _assetsCol(userId).doc(assetId).update({
+      'latestSnapshot': {
+        'value': latestData['value'],
+        'recordedAt': latestData['recordedAt'],
+        'entryId': latest.id,
+      },
+      'previousSnapshot': previousSnapshot,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   @override
   Stream<List<Asset>> watchAssets(String userId) {
     return _assetsCol(userId)
         .where('isArchived', isEqualTo: false)
         .orderBy('createdAt', descending: false)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => AssetModel.fromFirestore(d).toDomain()).toList());
+        .map(
+          (snap) => snap.docs
+              .map((d) => AssetModel.fromFirestore(d).toDomain())
+              .toList(),
+        );
   }
 
   @override
@@ -36,7 +78,9 @@ class AssetsRepositoryImpl implements AssetsRepository {
         .where('isArchived', isEqualTo: false)
         .orderBy('createdAt', descending: false)
         .get();
-    return snap.docs.map((d) => AssetModel.fromFirestore(d).toDomain()).toList();
+    return snap.docs
+        .map((d) => AssetModel.fromFirestore(d).toDomain())
+        .toList();
   }
 
   @override
@@ -90,16 +134,19 @@ class AssetsRepositoryImpl implements AssetsRepository {
     return _entriesCol(userId, assetId)
         .orderBy('recordedAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => AssetEntryModel.fromFirestore(d, assetId).toDomain())
-            .toList());
+        .map(
+          (snap) => snap.docs
+              .map((d) => AssetEntryModel.fromFirestore(d, assetId).toDomain())
+              .toList(),
+        );
   }
 
   @override
   Future<List<AssetEntry>> getEntries(String userId, String assetId) async {
-    final snap = await _entriesCol(userId, assetId)
-        .orderBy('recordedAt', descending: true)
-        .get();
+    final snap = await _entriesCol(
+      userId,
+      assetId,
+    ).orderBy('recordedAt', descending: true).get();
     return snap.docs
         .map((d) => AssetEntryModel.fromFirestore(d, assetId).toDomain())
         .toList();
@@ -113,6 +160,49 @@ class AssetsRepositoryImpl implements AssetsRepository {
     required DateTime recordedAt,
     String? note,
   }) async {
+    final dayStart = DateTime(
+      recordedAt.year,
+      recordedAt.month,
+      recordedAt.day,
+    );
+    final nextDayStart = dayStart.add(const Duration(days: 1));
+
+    final existingForDay = await _entriesCol(userId, assetId)
+        .where(
+          'recordedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart),
+          isLessThan: Timestamp.fromDate(nextDayStart),
+        )
+        .limit(1)
+        .get();
+
+    if (existingForDay.docs.isNotEmpty) {
+      final existing = existingForDay.docs.first;
+      final existingData = existing.data() as Map<String, dynamic>;
+      final updatePayload = <String, Object?>{
+        'value': value,
+        'recordedAt': Timestamp.fromDate(recordedAt),
+      };
+      final trimmedNote = note?.trim();
+      if (trimmedNote != null && trimmedNote.isNotEmpty) {
+        updatePayload['note'] = trimmedNote;
+      } else {
+        updatePayload['note'] = FieldValue.delete();
+      }
+
+      await existing.reference.update(updatePayload);
+      await _recalculateSnapshots(userId, assetId);
+
+      return AssetEntryModel(
+        id: existing.id,
+        assetId: assetId,
+        value: value,
+        note: trimmedNote,
+        recordedAt: recordedAt,
+        createdAt: (existingData['createdAt'] as Timestamp).toDate(),
+      ).toDomain();
+    }
+
     final entryId = _uuid.v4();
     final now = DateTime.now().toUtc();
     final model = AssetEntryModel(
@@ -124,61 +214,19 @@ class AssetsRepositoryImpl implements AssetsRepository {
       createdAt: now,
     );
 
-    // Batch: write entry + update latestSnapshot on asset atomically
-    final batch = _firestore.batch();
     final entryRef = _entriesCol(userId, assetId).doc(entryId);
-    batch.set(entryRef, model.toFirestore());
-
-    // Update latestSnapshot only if this entry is newer than existing snapshot
-    final assetDoc = await _assetsCol(userId).doc(assetId).get();
-    final assetData = assetDoc.data() as Map<String, dynamic>?;
-    final existingSnapshot = assetData?['latestSnapshot'] as Map<String, dynamic>?;
-    final existingDate = existingSnapshot != null
-        ? (existingSnapshot['recordedAt'] as Timestamp).toDate()
-        : null;
-
-    if (existingDate == null || recordedAt.isAfter(existingDate) ||
-        recordedAt.isAtSameMomentAs(existingDate)) {
-      batch.update(_assetsCol(userId).doc(assetId), {
-        'latestSnapshot': {
-          'value': value,
-          'recordedAt': Timestamp.fromDate(recordedAt),
-          'entryId': entryId,
-        },
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
-
-    await batch.commit();
+    await entryRef.set(model.toFirestore());
+    await _recalculateSnapshots(userId, assetId);
     return model.toDomain();
   }
 
   @override
-  Future<void> deleteEntry(String userId, String assetId, String entryId) async {
+  Future<void> deleteEntry(
+    String userId,
+    String assetId,
+    String entryId,
+  ) async {
     await _entriesCol(userId, assetId).doc(entryId).delete();
-
-    // Recalculate latestSnapshot
-    final snap = await _entriesCol(userId, assetId)
-        .orderBy('recordedAt', descending: true)
-        .limit(1)
-        .get();
-
-    if (snap.docs.isEmpty) {
-      await _assetsCol(userId).doc(assetId).update({
-        'latestSnapshot': null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } else {
-      final latest = snap.docs.first;
-      final data = latest.data() as Map<String, dynamic>;
-      await _assetsCol(userId).doc(assetId).update({
-        'latestSnapshot': {
-          'value': data['value'],
-          'recordedAt': data['recordedAt'],
-          'entryId': latest.id,
-        },
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
+    await _recalculateSnapshots(userId, assetId);
   }
 }

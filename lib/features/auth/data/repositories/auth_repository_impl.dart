@@ -9,8 +9,8 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({
     required FirebaseAuth firebaseAuth,
     required FirebaseFirestore firestore,
-  })  : _auth = firebaseAuth,
-        _firestore = firestore;
+  }) : _auth = firebaseAuth,
+       _firestore = firestore;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -46,7 +46,9 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
   }) async {
     final cred = await _auth.signInWithEmailAndPassword(
-        email: email, password: password);
+      email: email,
+      password: password,
+    );
     return _fetchOrCreateUser(cred.user!);
   }
 
@@ -57,15 +59,25 @@ class AuthRepositoryImpl implements AuthRepository {
     required String displayName,
   }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
-        email: email, password: password);
+      email: email,
+      password: password,
+    );
     await cred.user!.updateDisplayName(displayName);
     return _fetchOrCreateUser(cred.user!);
   }
 
   @override
   Future<void> signOut() async {
-    await GoogleSignIn.instance.signOut();
-    await _auth.signOut();
+    try {
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize();
+      await googleSignIn.signOut();
+    } catch (_) {
+      // Ignore provider-specific sign out issues; Firebase sign-out below
+      // is the source of truth for app auth state.
+    } finally {
+      await _auth.signOut();
+    }
   }
 
   @override
