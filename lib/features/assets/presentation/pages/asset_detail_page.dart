@@ -1,0 +1,424 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_entry.dart';
+import '../cubit/asset_detail_cubit.dart';
+import '../cubit/asset_detail_state.dart';
+import '../widgets/add_entry_sheet.dart';
+import '../widgets/asset_type_badge.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/date_formatter.dart';
+import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../../../features/auth/presentation/cubit/auth_state.dart';
+import '../../../../features/dashboard/domain/calculators/wealth_calculator.dart';
+import '../../../../core/di/service_locator.dart';
+
+class AssetDetailPage extends StatelessWidget {
+  const AssetDetailPage({super.key, required this.asset});
+
+  final Asset asset;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) {
+        final cubit = AssetDetailCubit(
+          repository: ServiceLocator.instance.assetsRepository,
+        );
+        final authState = context.read<AuthCubit>().state;
+        if (authState is AuthAuthenticated) {
+          cubit.loadDetail(authState.user.uid, asset.id, asset);
+        }
+        return cubit;
+      },
+      child: _AssetDetailView(asset: asset),
+    );
+  }
+}
+
+class _AssetDetailView extends StatelessWidget {
+  const _AssetDetailView({required this.asset});
+  final Asset asset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(asset.name),
+        actions: [
+          BlocBuilder<AssetDetailCubit, AssetDetailState>(
+            builder: (context, state) => IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+              tooltip: 'Dodaj wpis',
+              onPressed: () => _showAddEntry(context),
+            ),
+          ),
+        ],
+      ),
+      body: BlocBuilder<AssetDetailCubit, AssetDetailState>(
+        builder: (context, state) {
+          if (state is AssetDetailLoading || state is AssetDetailInitial) {
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+          if (state is AssetDetailError) {
+            return Center(child: Text(state.message, style: const TextStyle(color: AppColors.negative)));
+          }
+          if (state is AssetDetailLoaded) {
+            return _LoadedView(state: state, asset: asset, onAddEntry: () => _showAddEntry(context));
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+  }
+
+  void _showAddEntry(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider.value(
+        value: context.read<AssetDetailCubit>(),
+        child: AddEntrySheet(currency: asset.currency),
+      ),
+    );
+  }
+}
+
+class _LoadedView extends StatelessWidget {
+  const _LoadedView({required this.state, required this.asset, required this.onAddEntry});
+  final AssetDetailLoaded state;
+  final Asset asset;
+  final VoidCallback onAddEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(child: _HeaderCard(state: state, asset: asset)),
+        if (state.entries.isNotEmpty) ...[
+          SliverToBoxAdapter(child: _ChartSection(entries: state.entries, currency: asset.currency)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+              child: Text('Historia wpisów', style: Theme.of(context).textTheme.titleLarge),
+            ),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _EntryTile(
+                entry: state.entries[index],
+                currency: asset.currency,
+                onDelete: () => context.read<AssetDetailCubit>().deleteEntry(state.entries[index].id),
+              ),
+              childCount: state.entries.length,
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
+        if (state.entries.isEmpty)
+          SliverFillRemaining(
+            child: _EmptyEntries(onAdd: onAddEntry),
+          ),
+      ],
+    );
+  }
+}
+
+class _HeaderCard extends StatelessWidget {
+  const _HeaderCard({required this.state, required this.asset});
+  final AssetDetailLoaded state;
+  final Asset asset;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasChange = state.changeAbsolute != null;
+    final isPositive = (state.changeAbsolute ?? 0) >= 0;
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: AppColors.cardGradient,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AssetTypeBadge(type: asset.type),
+              const Spacer(),
+              Text(
+                asset.currency,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            state.latestValue != null
+                ? CurrencyFormatter.format(state.latestValue!, asset.currency)
+                : '— brak danych',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+          if (hasChange) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  isPositive ? Icons.trending_up : Icons.trending_down,
+                  size: 16,
+                  color: isPositive ? AppColors.positive : AppColors.negative,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  CurrencyFormatter.formatChange(state.changeAbsolute!, asset.currency),
+                  style: TextStyle(
+                    color: isPositive ? AppColors.positive : AppColors.negative,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '(${CurrencyFormatter.formatPercent(state.changePercent!)})',
+                  style: TextStyle(
+                    color: isPositive ? AppColors.positive : AppColors.negative,
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'vs poprzedni wpis',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+          if (state.entries.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Ostatni wpis: ${DateFormatter.dateOnly(state.entries.first.recordedAt)}',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChartSection extends StatelessWidget {
+  const _ChartSection({required this.entries, required this.currency});
+  final List<AssetEntry> entries;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.length < 2) return const SizedBox.shrink();
+    final points = WealthCalculator.toChartPoints(entries);
+    final minVal = points.map((p) => p.value).reduce((a, b) => a < b ? a : b);
+    final maxVal = points.map((p) => p.value).reduce((a, b) => a > b ? a : b);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Historia wartości',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 160,
+            child: _SimpleLineChart(points: points, minVal: minVal, maxVal: maxVal, currency: currency),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SimpleLineChart extends StatelessWidget {
+  const _SimpleLineChart({required this.points, required this.minVal, required this.maxVal, required this.currency});
+  final List<ChartPoint> points;
+  final double minVal;
+  final double maxVal;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _LineChartPainter(points: points, minVal: minVal, maxVal: maxVal),
+      child: Container(),
+    );
+  }
+}
+
+class _LineChartPainter extends CustomPainter {
+  const _LineChartPainter({required this.points, required this.minVal, required this.maxVal});
+  final List<ChartPoint> points;
+  final double minVal;
+  final double maxVal;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+    final range = (maxVal - minVal).abs();
+    final effectiveRange = range == 0 ? 1.0 : range;
+
+    double xStep = size.width / (points.length - 1).toDouble();
+    if (points.length == 1) xStep = size.width / 2;
+
+    Offset _toOffset(int index, double value) {
+      final x = points.length == 1 ? size.width / 2 : index * xStep;
+      final y = size.height - ((value - minVal) / effectiveRange) * size.height * 0.85 - size.height * 0.075;
+      return Offset(x, y);
+    }
+
+    // Gradient fill
+    final fillPath = Path();
+    fillPath.moveTo(0, size.height);
+    for (int i = 0; i < points.length; i++) {
+      fillPath.lineTo(_toOffset(i, points[i].value).dx, _toOffset(i, points[i].value).dy);
+    }
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    canvas.drawPath(
+      fillPath,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [AppColors.primary.withAlpha(80), AppColors.primary.withAlpha(0)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
+    );
+
+    // Line
+    final linePaint = Paint()
+      ..color = AppColors.primary
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    for (int i = 0; i < points.length; i++) {
+      final offset = _toOffset(i, points[i].value);
+      if (i == 0) path.moveTo(offset.dx, offset.dy);
+      else path.lineTo(offset.dx, offset.dy);
+    }
+    canvas.drawPath(path, linePaint);
+
+    // Last point dot
+    final lastOffset = _toOffset(points.length - 1, points.last.value);
+    canvas.drawCircle(lastOffset, 5, Paint()..color = AppColors.primary);
+    canvas.drawCircle(lastOffset, 3, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LineChartPainter old) =>
+      old.points != points || old.minVal != minVal || old.maxVal != maxVal;
+}
+
+class _EntryTile extends StatelessWidget {
+  const _EntryTile({required this.entry, required this.currency, required this.onDelete});
+  final AssetEntry entry;
+  final String currency;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key(entry.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: AppColors.negativeSurface,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete_outline, color: AppColors.negative),
+      ),
+      onDismissed: (_) => onDelete(),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    DateFormatter.dateOnly(entry.recordedAt),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  if (entry.note != null && entry.note!.isNotEmpty)
+                    Text(
+                      entry.note!,
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            Text(
+              CurrencyFormatter.format(entry.value, currency),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyEntries extends StatelessWidget {
+  const _EmptyEntries({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.history, color: AppColors.textMuted, size: 48),
+          const SizedBox(height: 16),
+          const Text('Brak wpisów wartości',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          const Text('Dodaj pierwszy wpis, aby rozpocząć śledzenie.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(onPressed: onAdd, icon: const Icon(Icons.add), label: const Text('Dodaj wpis')),
+        ],
+      ),
+    );
+  }
+}

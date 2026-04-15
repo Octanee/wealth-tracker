@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: only authenticated users can access their own data
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // User profile
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Asset metadata — never contains financial values
+      match /assets/{assetId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasAll(['name', 'type', 'currency', 'isArchived', 'createdAt', 'updatedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.isArchived == false;
+        allow update: if isOwner(userId);
+        allow delete: if false; // use soft delete (isArchived)
+
+        // Value entries — separated from asset metadata
+        match /entries/{entryId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && request.resource.data.keys().hasAll(['value', 'recordedAt', 'createdAt'])
+            && request.resource.data.value is number
+            && request.resource.data.value >= 0;
+          allow update: if false; // entries are immutable
+          allow delete: if isOwner(userId);
+        }
+      }
+    }
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
