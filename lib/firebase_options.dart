@@ -5,7 +5,23 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class DefaultFirebaseOptions {
+  static const _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
+  static const _authDomain = String.fromEnvironment('FIREBASE_AUTH_DOMAIN');
+  static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const _storageBucket = String.fromEnvironment(
+    'FIREBASE_STORAGE_BUCKET',
+  );
+  static const _messagingSenderId = String.fromEnvironment(
+    'FIREBASE_MESSAGING_SENDER_ID',
+  );
+  static const _appId = String.fromEnvironment('FIREBASE_APP_ID');
+  static const _measurementId = String.fromEnvironment(
+    'FIREBASE_MEASUREMENT_ID',
+  );
+
   static FirebaseOptions get currentPlatform {
+    _validateRequired();
+
     if (kIsWeb) return web;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -17,13 +33,33 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC3H4-e5dIlBPN_h3hvDEBzS0AfexsVqvw',
-    authDomain: 'wealth-tracker-538f6.firebaseapp.com',
-    projectId: 'wealth-tracker-538f6',
-    storageBucket: 'wealth-tracker-538f6.firebasestorage.app',
-    messagingSenderId: '246720050895',
-    appId: '1:246720050895:web:59467acee5b31b292129ba',
-    measurementId: 'G-F1PKS87LFW',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: _apiKey,
+    authDomain: _authDomain,
+    projectId: _projectId,
+    storageBucket: _storageBucket,
+    messagingSenderId: _messagingSenderId,
+    appId: _appId,
+    measurementId: _measurementId.isEmpty ? null : _measurementId,
   );
+
+  static void _validateRequired() {
+    final missing = <String>[];
+
+    if (_apiKey.isEmpty) missing.add('FIREBASE_API_KEY');
+    if (_authDomain.isEmpty) missing.add('FIREBASE_AUTH_DOMAIN');
+    if (_projectId.isEmpty) missing.add('FIREBASE_PROJECT_ID');
+    if (_storageBucket.isEmpty) missing.add('FIREBASE_STORAGE_BUCKET');
+    if (_messagingSenderId.isEmpty) {
+      missing.add('FIREBASE_MESSAGING_SENDER_ID');
+    }
+    if (_appId.isEmpty) missing.add('FIREBASE_APP_ID');
+
+    if (missing.isNotEmpty) {
+      throw StateError(
+        'Missing Firebase environment variables: ${missing.join(', ')}. '
+        'Pass them with --dart-define.',
+      );
+    }
+  }
 }
