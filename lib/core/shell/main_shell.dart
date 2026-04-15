@@ -3,9 +3,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 
 class MainShell extends StatelessWidget {
-  const MainShell({super.key, required this.shell});
+  const MainShell({super.key, required this.child});
 
-  final StatefulNavigationShell shell;
+  final Widget child;
+
+  static const _routes = ['/dashboard', '/assets', '/settings'];
 
   static const _destinations = [
     _NavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Dashboard'),
@@ -15,34 +17,55 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    var index = _routes.indexWhere((r) => location.startsWith(r));
+    if (index < 0) index = 0;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 768;
         return isDesktop
-            ? _DesktopLayout(shell: shell, destinations: _destinations)
-            : _MobileLayout(shell: shell, destinations: _destinations);
+            ? _DesktopLayout(
+                child: child,
+                destinations: _destinations,
+                currentIndex: index,
+                onDestinationSelected: (i) => context.go(_routes[i]),
+              )
+            : _MobileLayout(
+                child: child,
+                destinations: _destinations,
+                currentIndex: index,
+                onDestinationSelected: (i) => context.go(_routes[i]),
+              );
       },
     );
   }
 }
 
 class _MobileLayout extends StatelessWidget {
-  const _MobileLayout({required this.shell, required this.destinations});
+  const _MobileLayout({
+    required this.child,
+    required this.destinations,
+    required this.currentIndex,
+    required this.onDestinationSelected,
+  });
 
-  final StatefulNavigationShell shell;
+  final Widget child;
   final List<_NavItem> destinations;
+  final int currentIndex;
+  final ValueChanged<int> onDestinationSelected;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: shell,
+      body: child,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.divider, width: 1)),
         ),
         child: NavigationBar(
-          selectedIndex: shell.currentIndex,
-          onDestinationSelected: shell.goBranch,
+          selectedIndex: currentIndex,
+          onDestinationSelected: onDestinationSelected,
           destinations: destinations
               .map((d) => NavigationDestination(
                     icon: Icon(d.icon),
@@ -57,10 +80,17 @@ class _MobileLayout extends StatelessWidget {
 }
 
 class _DesktopLayout extends StatelessWidget {
-  const _DesktopLayout({required this.shell, required this.destinations});
+  const _DesktopLayout({
+    required this.child,
+    required this.destinations,
+    required this.currentIndex,
+    required this.onDestinationSelected,
+  });
 
-  final StatefulNavigationShell shell;
+  final Widget child;
   final List<_NavItem> destinations;
+  final int currentIndex;
+  final ValueChanged<int> onDestinationSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -73,8 +103,8 @@ class _DesktopLayout extends StatelessWidget {
               border: Border(right: BorderSide(color: AppColors.divider)),
             ),
             child: NavigationRail(
-              selectedIndex: shell.currentIndex,
-              onDestinationSelected: shell.goBranch,
+              selectedIndex: currentIndex,
+              onDestinationSelected: onDestinationSelected,
               extended: true,
               minExtendedWidth: 220,
               leading: const _NavRailHeader(),
@@ -87,7 +117,7 @@ class _DesktopLayout extends StatelessWidget {
                   .toList(),
             ),
           ),
-          Expanded(child: shell),
+          Expanded(child: child),
         ],
       ),
     );

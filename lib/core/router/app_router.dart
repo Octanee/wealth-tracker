@@ -31,41 +31,29 @@ class AppRouter {
           path: '/login',
           builder: (_, __) => const LoginPage(),
         ),
-        StatefulShellRoute.indexedStack(
-          builder: (_, __, shell) => MainShell(shell: shell),
-          branches: [
-            StatefulShellBranch(
+        ShellRoute(
+          builder: (_, __, child) => MainShell(child: child),
+          routes: [
+            GoRoute(
+              path: '/dashboard',
+              builder: (_, __) => const DashboardPage(),
+            ),
+            GoRoute(
+              path: '/assets',
+              builder: (_, __) => const AssetsPage(),
               routes: [
                 GoRoute(
-                  path: '/dashboard',
-                  builder: (_, __) => const DashboardPage(),
+                  path: ':id',
+                  builder: (context, state) {
+                    final asset = state.extra as Asset;
+                    return AssetDetailPage(asset: asset);
+                  },
                 ),
               ],
             ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: '/assets',
-                  builder: (_, __) => const AssetsPage(),
-                  routes: [
-                    GoRoute(
-                      path: ':id',
-                      builder: (context, state) {
-                        final asset = state.extra as Asset;
-                        return AssetDetailPage(asset: asset);
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: '/settings',
-                  builder: (_, __) => const SettingsPage(),
-                ),
-              ],
+            GoRoute(
+              path: '/settings',
+              builder: (_, __) => const SettingsPage(),
             ),
           ],
         ),
