@@ -178,29 +178,25 @@ class AssetsRepositoryImpl implements AssetsRepository {
 
     if (existingForDay.docs.isNotEmpty) {
       final existing = existingForDay.docs.first;
-      final existingData = existing.data() as Map<String, dynamic>;
-      final updatePayload = <String, Object?>{
-        'value': value,
-        'recordedAt': Timestamp.fromDate(recordedAt),
-      };
-      final trimmedNote = note?.trim();
-      if (trimmedNote != null && trimmedNote.isNotEmpty) {
-        updatePayload['note'] = trimmedNote;
-      } else {
-        updatePayload['note'] = FieldValue.delete();
-      }
-
-      await existing.reference.update(updatePayload);
-      await _recalculateSnapshots(userId, assetId);
-
-      return AssetEntryModel(
-        id: existing.id,
+      final replacementId = _uuid.v4();
+      final replacement = AssetEntryModel(
+        id: replacementId,
         assetId: assetId,
         value: value,
-        note: trimmedNote,
+        note: note,
         recordedAt: recordedAt,
-        createdAt: (existingData['createdAt'] as Timestamp).toDate(),
-      ).toDomain();
+        createdAt: DateTime.now().toUtc(),
+      );
+
+      final batch = _firestore.batch();
+      batch.delete(existing.reference);
+      batch.set(
+        _entriesCol(userId, assetId).doc(replacementId),
+        replacement.toFirestore(),
+      );
+      await batch.commit();
+      await _recalculateSnapshots(userId, assetId);
+      return replacement.toDomain();
     }
 
     final entryId = _uuid.v4();
