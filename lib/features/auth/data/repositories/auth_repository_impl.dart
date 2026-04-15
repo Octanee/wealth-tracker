@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -27,17 +28,44 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserEntity> signInWithGoogle() async {
-    // google_sign_in 7.x: use GoogleSignIn.instance + OAuthProvider
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider();
+      final userCredential = await _auth.signInWithPopup(provider);
+      final user = userCredential.user;
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'google-sign-in-failed',
+          message: 'Nie udało się zalogować kontem Google.',
+        );
+      }
+      return _fetchOrCreateUser(user);
+    }
+
     final googleSignIn = GoogleSignIn.instance;
     await googleSignIn.initialize();
-
     final googleUser = await googleSignIn.authenticate();
-    // In 7.x, we use OAuthProvider to create Firebase credential
+    final googleAuth = googleUser.authentication;
+
     final credential = GoogleAuthProvider.credential(
-      idToken: googleUser.authentication.idToken,
+      idToken: googleAuth.idToken,
     );
+
+    if (credential.idToken == null) {
+      throw FirebaseAuthException(
+        code: 'google-token-missing',
+        message: 'Brak tokenu Google do logowania.',
+      );
+    }
+
     final userCredential = await _auth.signInWithCredential(credential);
-    return _fetchOrCreateUser(userCredential.user!);
+    final user = userCredential.user;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'google-sign-in-failed',
+        message: 'Nie udało się zalogować kontem Google.',
+      );
+    }
+    return _fetchOrCreateUser(user);
   }
 
   @override
@@ -68,6 +96,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> signOut() async {
+    if (kIsWeb) {
+      await _auth.signOut();
+      return;
+    }
+
     try {
       final googleSignIn = GoogleSignIn.instance;
       await googleSignIn.initialize();
