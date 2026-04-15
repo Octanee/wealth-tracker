@@ -44,4 +44,11 @@ abstract class AssetsRepository {
 
   /// Delete a single entry — recalculates latestSnapshot if needed
   Future<void> deleteEntry(String userId, String assetId, String entryId);
+
+  /// Bulk fetch of all entries for multiple assets.
+  /// Returns assetId → entries sorted by recordedAt ASC (oldest first).
+  Future<Map<String, List<AssetEntry>>> getAllEntries(
+    String userId,
+    List<String> assetIds,
+  );
 }

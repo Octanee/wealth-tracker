@@ -225,4 +225,19 @@ class AssetsRepositoryImpl implements AssetsRepository {
     await _entriesCol(userId, assetId).doc(entryId).delete();
     await _recalculateSnapshots(userId, assetId);
   }
+
+  @override
+  Future<Map<String, List<AssetEntry>>> getAllEntries(
+    String userId,
+    List<String> assetIds,
+  ) async {
+    if (assetIds.isEmpty) return {};
+    final results = await Future.wait(
+      assetIds.map((id) async {
+        final entries = await getEntries(userId, id); // DESC order
+        return MapEntry(id, entries.reversed.toList()); // flip to ASC
+      }),
+    );
+    return Map.fromEntries(results);
+  }
 }

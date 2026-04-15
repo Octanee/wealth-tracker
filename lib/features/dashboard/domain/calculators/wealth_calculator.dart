@@ -57,6 +57,88 @@ class WealthCalculator {
     final percent = previous == 0 ? 0.0 : (delta / previous) * 100;
     return EntryChange(delta: delta, percent: percent);
   }
+
+  /// Builds a per-currency portfolio value time series from all asset entries.
+  ///
+  /// [assets] must include all assets whose entries are provided.
+  /// [entriesByAsset] maps assetId → entries sorted by recordedAt ASC.
+  ///
+  /// Algorithm: collect all unique entry dates across all assets, sort ascending,
+  /// then for each date sum each asset's "last known value" (carry-forward from
+  /// its first entry date). Assets with no entry yet are skipped for that date.
+  static Map<String, List<ChartPoint>> portfolioHistory(
+    List<Asset> assets,
+    Map<String, List<AssetEntry>> entriesByAsset,
+  ) {
+    // Collect all unique dates (normalized to midnight UTC)
+    final allDates = <DateTime>{};
+    for (final entries in entriesByAsset.values) {
+      for (final entry in entries) {
+        allDates.add(
+          DateTime.utc(
+            entry.recordedAt.year,
+            entry.recordedAt.month,
+            entry.recordedAt.day,
+          ),
+        );
+      }
+    }
+    if (allDates.isEmpty) return {};
+
+    final sortedDates = allDates.toList()..sort();
+
+    // Group assets by currency (only include assets that have at least one entry)
+    final assetsByCurrency = <String, List<Asset>>{};
+    for (final asset in assets) {
+      if (entriesByAsset[asset.id]?.isNotEmpty == true) {
+        assetsByCurrency.putIfAbsent(asset.currency, () => []).add(asset);
+      }
+    }
+
+    final result = <String, List<ChartPoint>>{};
+
+    for (final currency in assetsByCurrency.keys) {
+      final assetsInCurrency = assetsByCurrency[currency]!;
+      final points = <ChartPoint>[];
+
+      for (final date in sortedDates) {
+        var total = 0.0;
+        var hasAnyValue = false;
+
+        for (final asset in assetsInCurrency) {
+          final entries = entriesByAsset[asset.id] ?? []; // ASC order
+          // Binary-search style: last entry with recordedAt <= date
+          double? lastValue;
+          for (final entry in entries) {
+            final entryDate = DateTime.utc(
+              entry.recordedAt.year,
+              entry.recordedAt.month,
+              entry.recordedAt.day,
+            );
+            if (!entryDate.isAfter(date)) {
+              lastValue = entry.value;
+            } else {
+              break;
+            }
+          }
+          if (lastValue != null) {
+            total += lastValue;
+            hasAnyValue = true;
+          }
+        }
+
+        if (hasAnyValue) {
+          points.add(ChartPoint(date: date, value: total));
+        }
+      }
+
+      if (points.isNotEmpty) {
+        result[currency] = points;
+      }
+    }
+
+    return result;
+  }
 }
 
 enum TrendDirection { up, down, neutral }

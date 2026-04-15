@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../domain/calculators/wealth_calculator.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/dashboard_state.dart';
+import '../widgets/portfolio_history_chart.dart';
 import '../../../../features/assets/domain/entities/asset.dart';
 import '../../../../features/assets/domain/entities/asset_type.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -122,6 +124,14 @@ class _DashboardContent extends StatelessWidget {
   const _DashboardContent({required this.state});
   final DashboardLoaded state;
 
+  Map<String, List<ChartPoint>> get _historyWithEnoughData {
+    final history = state.portfolioHistory;
+    if (history == null || history.isEmpty) return const {};
+    return Map.fromEntries(
+      history.entries.where((entry) => entry.value.length >= 2),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -130,7 +140,7 @@ class _DashboardContent extends StatelessWidget {
       onRefresh: () async {
         final authState = context.read<AuthCubit>().state;
         if (authState is AuthAuthenticated) {
-          context.read<DashboardCubit>().loadDashboard(authState.user.uid);
+          await context.read<DashboardCubit>().reloadHistory(authState.user.uid);
         }
       },
       child: SingleChildScrollView(
@@ -145,6 +155,15 @@ class _DashboardContent extends StatelessWidget {
             children: [
               _TotalWealthSection(totalByCurrency: state.totalByCurrency),
               const SizedBox(height: 20),
+              if (_historyWithEnoughData.isNotEmpty) ...[
+                for (final entry in _historyWithEnoughData.entries) ...[
+                  PortfolioHistoryChart(
+                    points: entry.value,
+                    currency: entry.key,
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ],
               if (state.assetsWithValue.isNotEmpty) ...[
                 _AllocationSection(state: state),
                 const SizedBox(height: 20),
