@@ -160,7 +160,17 @@ class PortfolioValuationService {
     if (asset.config case MetalAssetConfig(:final quantityGrams)) {
       if (latestGoldPricePln == null) return null;
 
-      final valueInPln = latestGoldPricePln * quantityGrams;
+      double effectiveQuantityGrams = quantityGrams;
+      for (final entry in entries) {
+        final entryDate = _normalize(entry.recordedAt);
+        if (!entryDate.isAfter(date)) {
+          effectiveQuantityGrams = entry.value;
+        } else {
+          break;
+        }
+      }
+
+      final valueInPln = latestGoldPricePln * effectiveQuantityGrams;
       if (asset.currency == 'PLN') {
         return valueInPln;
       }

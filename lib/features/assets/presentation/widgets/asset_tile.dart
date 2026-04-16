@@ -205,11 +205,19 @@ class AssetTile extends StatelessWidget {
 
   String _secondaryLabel(Asset asset) {
     if (asset.config case MetalAssetConfig(:final quantityGrams)) {
-      return '${quantityGrams.toStringAsFixed(2)} g złota';
+      final quantity = asset.latestSnapshot?.value ?? quantityGrams;
+      return '${_formatGrams(quantity)} g złota';
     }
     if (asset.config case CashAssetConfig(:final cashAmount)) {
       return 'Saldo: ${CurrencyFormatter.formatCompact(cashAmount, asset.currency)}';
     }
     return 'Wartość natywna aktywa';
+  }
+
+  String _formatGrams(double value) {
+    final formatted = value.toStringAsFixed(6);
+    return formatted
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 }

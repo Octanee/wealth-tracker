@@ -70,11 +70,12 @@ class AssetValuationService {
       if (metalType != PreciousMetalType.gold) {
         return null;
       }
+      final currentQuantityGrams = asset.latestSnapshot?.value ?? quantityGrams;
       final goldPricePln = await _ratesRepository.getGoldPricePerGram(
         date: asOfDate,
       );
       if (goldPricePln == null) return null;
-      final valueInPln = goldPricePln * quantityGrams;
+      final valueInPln = goldPricePln * currentQuantityGrams;
       if (asset.currency == 'PLN') {
         return valueInPln;
       }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_entry.dart';
+import '../../domain/entities/asset_type.dart';
 import '../cubit/asset_detail_cubit.dart';
 import '../cubit/asset_detail_state.dart';
 import '../widgets/add_entry_sheet.dart';
@@ -155,12 +156,21 @@ class _AssetDetailView extends StatelessWidget {
   }
 
   void _showAddEntry(BuildContext context, Asset currentAsset) {
+    final isMetal = currentAsset.type == AssetType.metal;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: context.read<AssetDetailCubit>(),
-        child: AddEntrySheet(currency: currentAsset.currency),
+        child: AddEntrySheet(
+          currency: isMetal ? 'g' : currentAsset.currency,
+          valueLabel: isMetal ? 'Ilość' : 'Wartość',
+          valueHintText: isMetal ? 'np. 31,123456' : null,
+          maxDecimalPlaces: isMetal ? 6 : 2,
+          valueIcon: isMetal
+              ? Icons.scale_outlined
+              : Icons.attach_money_outlined,
+        ),
       ),
     );
   }
@@ -170,13 +180,20 @@ class _AssetDetailView extends StatelessWidget {
     AssetEntry entry,
     Asset currentAsset,
   ) async {
+    final isMetal = currentAsset.type == AssetType.metal;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: context.read<AssetDetailCubit>(),
         child: AddEntrySheet(
-          currency: currentAsset.currency,
+          currency: isMetal ? 'g' : currentAsset.currency,
+          valueLabel: isMetal ? 'Ilość' : 'Wartość',
+          valueHintText: isMetal ? 'np. 31,123456' : null,
+          maxDecimalPlaces: isMetal ? 6 : 2,
+          valueIcon: isMetal
+              ? Icons.scale_outlined
+              : Icons.attach_money_outlined,
           initialEntry: entry,
           lockDate: true,
         ),
@@ -327,6 +344,7 @@ class _LoadedView extends StatelessWidget {
               (context, index) => _EntryTile(
                 entry: state.entries[index],
                 currency: asset.currency,
+                isMetal: asset.type == AssetType.metal,
                 onDelete: () => context.read<AssetDetailCubit>().deleteEntry(
                   state.entries[index].id,
                 ),
@@ -442,10 +460,7 @@ class _HeaderCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      CurrencyFormatter.formatChange(
-                        state.changeAbsolute!,
-                        asset.currency,
-                      ),
+                      _formatChange(asset, state.changeAbsolute!),
                       style: TextStyle(
                         color: isPositive
                             ? AppColors.positive
@@ -494,7 +509,8 @@ class _HeaderCard extends StatelessWidget {
 
   String _configDescription(Asset asset) {
     if (asset.config case MetalAssetConfig(:final quantityGrams)) {
-      return 'Złoto: ${quantityGrams.toStringAsFixed(2)} g, wycena z API NBP.';
+      final quantity = asset.latestSnapshot?.value ?? quantityGrams;
+      return 'Złoto: ${_formatGrams(quantity)} g, wycena z API NBP.';
     }
     if (asset.config case CashAssetConfig(:final cashAmount)) {
       return 'Saldo konfiguracyjne: ${CurrencyFormatter.format(cashAmount, asset.currency)}';
@@ -502,6 +518,21 @@ class _HeaderCard extends StatelessWidget {
     return asset.type.allowsManualEntries
         ? 'Bieżąca wartość wynika z ostatniego wpisu.'
         : 'Wartość aktywa jest wyliczana automatycznie.';
+  }
+
+  String _formatChange(Asset asset, double change) {
+    if (asset.type == AssetType.metal) {
+      final sign = change >= 0 ? '+' : '';
+      return '$sign${_formatGrams(change.abs())} g';
+    }
+    return CurrencyFormatter.formatChange(change, asset.currency);
+  }
+
+  String _formatGrams(double value) {
+    final formatted = value.toStringAsFixed(6);
+    return formatted
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 }
 
@@ -664,11 +695,13 @@ class _EntryTile extends StatelessWidget {
   const _EntryTile({
     required this.entry,
     required this.currency,
+    required this.isMetal,
     required this.onDelete,
     required this.onEdit,
   });
   final AssetEntry entry;
   final String currency;
+  final bool isMetal;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
 
@@ -723,7 +756,9 @@ class _EntryTile extends StatelessWidget {
                 ),
               ),
               Text(
-                CurrencyFormatter.format(entry.value, currency),
+                isMetal
+                    ? '${_formatGrams(entry.value)} g'
+                    : CurrencyFormatter.format(entry.value, currency),
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w700,
@@ -772,6 +807,13 @@ class _EntryTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatGrams(double value) {
+    final formatted = value.toStringAsFixed(6);
+    return formatted
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 }
 

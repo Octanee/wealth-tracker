@@ -10,10 +10,18 @@ class AddEntrySheet extends StatefulWidget {
   const AddEntrySheet({
     super.key,
     required this.currency,
+    this.valueLabel = 'Wartość',
+    this.valueIcon = Icons.attach_money_outlined,
+    this.valueHintText,
+    this.maxDecimalPlaces = 2,
     this.initialEntry,
     this.lockDate = false,
   });
   final String currency;
+  final String valueLabel;
+  final IconData valueIcon;
+  final String? valueHintText;
+  final int maxDecimalPlaces;
   final AssetEntry? initialEntry;
   final bool lockDate;
 
@@ -96,9 +104,14 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                   final text = newValue.text;
                   if (text.isEmpty) return newValue;
                   // Allow only digits and at most one decimal separator.
-                  // Optional decimal part is limited to 2 digits for currency-like values.
-                  final validPattern = RegExp(r'^\d+([\.,]\d{0,2})?$');
-                  if (validPattern.hasMatch(text)) {
+                  // Optional decimal part is limited by maxDecimalPlaces.
+                  final validPattern = RegExp(
+                    '^\\d+([\\.,]\\d{0,' +
+                        widget.maxDecimalPlaces.toString() +
+                        '})?',
+                  );
+                  final match = validPattern.matchAsPrefix(text);
+                  if (match != null && match.end == text.length) {
                     return newValue;
                   }
                   return oldValue;
@@ -110,13 +123,14 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                 fontWeight: FontWeight.w700,
               ),
               decoration: InputDecoration(
-                labelText: 'Wartość',
+                labelText: widget.valueLabel,
+                hintText: widget.valueHintText,
                 suffixText: widget.currency,
                 suffixStyle: const TextStyle(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
-                prefixIcon: const Icon(Icons.attach_money_outlined, size: 20),
+                prefixIcon: Icon(widget.valueIcon, size: 20),
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Wymagana wartość';

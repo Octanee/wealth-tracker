@@ -52,5 +52,5 @@ enum AssetType {
 
   bool get supportsMetalConfig => this == AssetType.metal;
 
-  bool get allowsManualEntries => this != AssetType.metal;
+  bool get allowsManualEntries => true;
 }

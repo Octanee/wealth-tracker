@@ -32,11 +32,11 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
   final _cashController = TextEditingController();
-  final _quantityController = TextEditingController();
   AssetType _selectedType = AssetType.bank;
   PreciousMetalType _selectedMetalType = PreciousMetalType.gold;
   String _selectedCurrency = 'PLN';
   String _selectedColor = '#4F6EF7';
+  double _initialMetalQuantityGrams = 0;
   bool _isLoading = false;
 
   static const _typeColors = {
@@ -68,7 +68,7 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
         :final quantityGrams,
       )) {
         _selectedMetalType = metalType;
-        _quantityController.text = quantityGrams.toStringAsFixed(2);
+        _initialMetalQuantityGrams = quantityGrams;
       }
     }
     _ensureSelectedCurrencyIsSupported();
@@ -79,7 +79,6 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
     _nameController.dispose();
     _descController.dispose();
     _cashController.dispose();
-    _quantityController.dispose();
     super.dispose();
   }
 
@@ -254,29 +253,11 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
                 },
               ),
               const SizedBox(height: 14),
-              TextFormField(
-                controller: _quantityController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Ilość w gramach',
-                  hintText: 'np. 31.10',
-                  prefixIcon: Icon(Icons.scale_outlined, size: 20),
-                  helperText:
-                      'Wycena będzie pobierana automatycznie z API NBP.',
-                  helperStyle: TextStyle(color: AppColors.textMuted),
-                ),
-                validator: (value) {
-                  if (!_selectedType.supportsMetalConfig) return null;
-                  final parsed = _parseDecimal(value);
-                  if (parsed == null) return 'Podaj poprawną ilość';
-                  if (parsed <= 0) return 'Ilość musi być większa od zera';
-                  return null;
-                },
+              const Text(
+                'Ilość złota dodasz później we wpisach historii (w gramach).',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
             ],
             TextFormField(
               controller: _descController,
@@ -362,13 +343,10 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
     }
 
     if (_selectedType.supportsMetalConfig) {
-      final parsed = _parseDecimal(_quantityController.text);
-      if (parsed != null) {
-        return MetalAssetConfig(
-          metalType: _selectedMetalType,
-          quantityGrams: parsed,
-        );
-      }
+      return MetalAssetConfig(
+        metalType: _selectedMetalType,
+        quantityGrams: _initialMetalQuantityGrams,
+      );
     }
 
     return null;

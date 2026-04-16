@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../domain/repositories/assets_repository.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_entry.dart';
 import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_type.dart';
 import 'asset_detail_state.dart';
@@ -21,18 +22,20 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
   StreamSubscription? _entriesSub;
   String? _userId;
   String? _assetId;
+  Asset? _currentAsset;
 
   void loadDetail(String userId, String assetId, Asset asset) {
     _userId = userId;
     _assetId = assetId;
+    _currentAsset = asset;
     emit(const AssetDetailLoading());
     _entriesSub?.cancel();
-    _entriesSub = _repository
-        .watchEntries(userId, assetId)
-        .listen(
-          (entries) => emit(AssetDetailLoaded(asset: asset, entries: entries)),
-          onError: (e) => emit(AssetDetailError(e.toString())),
-        );
+    _entriesSub = _repository.watchEntries(userId, assetId).listen((entries) {
+      final sourceAsset = _currentAsset ?? asset;
+      final syncedAsset = _syncSnapshots(sourceAsset, entries);
+      _currentAsset = syncedAsset;
+      emit(AssetDetailLoaded(asset: syncedAsset, entries: entries));
+    }, onError: (e) => emit(AssetDetailError(e.toString())));
   }
 
   Future<String?> addEntry({
@@ -64,10 +67,25 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
 
   Future<void> deleteEntry(String entryId) async {
     if (_userId == null || _assetId == null) return;
+
+    final previousState = state;
+    if (previousState is AssetDetailLoaded) {
+      final updatedEntries = previousState.entries
+          .where((entry) => entry.id != entryId)
+          .toList();
+      final syncedAsset = _syncSnapshots(previousState.asset, updatedEntries);
+      _currentAsset = syncedAsset;
+      emit(AssetDetailLoaded(asset: syncedAsset, entries: updatedEntries));
+    }
+
     try {
       await _repository.deleteEntry(_userId!, _assetId!, entryId);
       unawaited(_analytics.logEntryDeleted(assetId: _assetId!));
     } catch (e) {
+      if (previousState is AssetDetailLoaded) {
+        _currentAsset = previousState.asset;
+        emit(previousState);
+      }
       emit(AssetDetailError(e.toString()));
     }
   }
@@ -101,11 +119,40 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
 
     try {
       await _repository.updateAsset(_userId!, updated);
+      _currentAsset = updated;
       emit(AssetDetailLoaded(asset: updated, entries: current.entries));
       return null;
     } catch (_) {
       return 'Nie udało się zapisać zmian aktywa.';
     }
+  }
+
+  Asset _syncSnapshots(Asset asset, List<AssetEntry> entries) {
+    if (entries.isEmpty) {
+      return asset.copyWith(latestSnapshot: null, previousSnapshot: null);
+    }
+
+    final latestEntry = entries.first;
+    final latestSnapshot = LatestSnapshot(
+      value: latestEntry.value,
+      recordedAt: latestEntry.recordedAt,
+      entryId: latestEntry.id,
+    );
+
+    LatestSnapshot? previousSnapshot;
+    if (entries.length > 1) {
+      final previousEntry = entries[1];
+      previousSnapshot = LatestSnapshot(
+        value: previousEntry.value,
+        recordedAt: previousEntry.recordedAt,
+        entryId: previousEntry.id,
+      );
+    }
+
+    return asset.copyWith(
+      latestSnapshot: latestSnapshot,
+      previousSnapshot: previousSnapshot,
+    );
   }
 
   Future<String?> archiveAsset() async {
