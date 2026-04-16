@@ -78,17 +78,44 @@ class PortfolioValuationService {
     final today = _normalize(DateTime.now().toUtc());
     allDates.add(today);
 
+    DateTime? minDate;
+
     for (final asset in assets) {
-      allDates.add(_normalize(asset.createdAt));
-      for (final entry in entriesByAsset[asset.id] ?? const <AssetEntry>[]) {
-        allDates.add(_normalize(entry.recordedAt));
+      final createdAt = _normalize(asset.createdAt);
+      allDates.add(createdAt);
+      if (minDate == null || createdAt.isBefore(minDate)) {
+        minDate = createdAt;
       }
+      for (final entry in entriesByAsset[asset.id] ?? const <AssetEntry>[]) {
+        final recordedAt = _normalize(entry.recordedAt);
+        allDates.add(recordedAt);
+        if (minDate == null || recordedAt.isBefore(minDate)) {
+          minDate = recordedAt;
+        }
+      }
+    }
+
+    final hasGoldAssets = assets.any(
+      (asset) => asset.config is MetalAssetConfig,
+    );
+    Map<DateTime, double> goldSeries = const {};
+    if (hasGoldAssets && minDate != null) {
+      goldSeries = await _assetValuationService.getGoldPriceSeriesPerGram(
+        startDate: minDate,
+        endDate: today,
+      );
+      allDates.addAll(goldSeries.keys);
     }
 
     final sortedDates = allDates.toList()..sort();
     final points = <ChartPoint>[];
+    double? latestGoldPricePln;
 
     for (final date in sortedDates) {
+      if (goldSeries.containsKey(date)) {
+        latestGoldPricePln = goldSeries[date];
+      }
+
       var total = 0.0;
       var hasAnyValue = false;
 
@@ -97,23 +124,19 @@ class PortfolioValuationService {
           asset,
           entriesByAsset[asset.id] ?? const <AssetEntry>[],
           date,
+          latestGoldPricePln: latestGoldPricePln,
         );
         if (nativeValue == null) continue;
 
-        final converted = await _assetValuationService.valuateAsset(
-          asset.copyWith(
-            latestSnapshot: LatestSnapshot(
-              value: nativeValue,
-              recordedAt: date,
-              entryId: asset.latestSnapshot?.entryId ?? 'derived',
-            ),
-          ),
-          baseCurrency: baseCurrency,
+        final converted = await _assetValuationService.convertAmount(
+          amount: nativeValue,
+          fromCurrency: asset.currency,
+          toCurrency: baseCurrency,
           asOfDate: date,
         );
 
-        if (converted?.baseValue == null) continue;
-        total += converted!.baseValue!;
+        if (converted == null) continue;
+        total += converted;
         hasAnyValue = true;
       }
 
@@ -128,13 +151,26 @@ class PortfolioValuationService {
   Future<double?> _resolveNativeValueOnDate(
     Asset asset,
     List<AssetEntry> entries,
-    DateTime date,
-  ) async {
+    DateTime date, {
+    double? latestGoldPricePln,
+  }) async {
     final normalizedCreatedAt = _normalize(asset.createdAt);
     if (date.isBefore(normalizedCreatedAt)) return null;
 
-    if (asset.config is MetalAssetConfig) {
-      return _assetValuationService.resolveNativeValue(asset, asOfDate: date);
+    if (asset.config case MetalAssetConfig(:final quantityGrams)) {
+      if (latestGoldPricePln == null) return null;
+
+      final valueInPln = latestGoldPricePln * quantityGrams;
+      if (asset.currency == 'PLN') {
+        return valueInPln;
+      }
+
+      return _assetValuationService.convertAmount(
+        amount: valueInPln,
+        fromCurrency: 'PLN',
+        toCurrency: asset.currency,
+        asOfDate: date,
+      );
     }
 
     double? lastValue;

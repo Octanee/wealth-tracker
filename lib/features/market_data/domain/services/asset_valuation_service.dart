@@ -38,6 +38,30 @@ class AssetValuationService {
     );
   }
 
+  Future<double?> convertAmount({
+    required double amount,
+    required String fromCurrency,
+    required String toCurrency,
+    DateTime? asOfDate,
+  }) {
+    return _ratesRepository.convert(
+      amount: amount,
+      fromCurrency: fromCurrency,
+      toCurrency: toCurrency,
+      date: asOfDate,
+    );
+  }
+
+  Future<Map<DateTime, double>> getGoldPriceSeriesPerGram({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    return _ratesRepository.getGoldPriceSeriesPerGram(
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
   Future<double?> resolveNativeValue(Asset asset, {DateTime? asOfDate}) async {
     if (asset.config case MetalAssetConfig(
       :final metalType,

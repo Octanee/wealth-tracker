@@ -13,4 +13,9 @@ abstract class ExchangeRateRepository {
   });
 
   Future<double?> getGoldPricePerGram({DateTime? date});
+
+  Future<Map<DateTime, double>> getGoldPriceSeriesPerGram({
+    required DateTime startDate,
+    required DateTime endDate,
+  });
 }

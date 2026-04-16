@@ -42,6 +42,37 @@ class NbpApiClient {
     }
   }
 
+  Future<Map<DateTime, double>> getGoldPriceSeriesPerGram({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final start = _normalizeDate(startDate);
+    final end = _normalizeDate(endDate);
+    if (start.isAfter(end)) return {};
+
+    final series = <DateTime, double>{};
+    var chunkStart = start;
+
+    while (!chunkStart.isAfter(end)) {
+      final chunkEndCandidate = chunkStart.add(const Duration(days: 92));
+      final chunkEnd = chunkEndCandidate.isAfter(end) ? end : chunkEndCandidate;
+
+      try {
+        final json = await _getJson(
+          '/cenyzlota/${_formatDate(chunkStart)}/${_formatDate(chunkEnd)}/',
+        );
+        final chunk = _parseGoldSeries(json);
+        series.addAll(chunk);
+      } on _NbpNotFoundException {
+        // No publication in selected window (e.g. weekend-only range).
+      }
+
+      chunkStart = chunkEnd.add(const Duration(days: 1));
+    }
+
+    return series;
+  }
+
   Future<double> _getMidRateToPlnFallback(String code, DateTime date) async {
     final startDate = date.subtract(const Duration(days: 7));
     final json = await _getJson(
@@ -102,8 +133,25 @@ class NbpApiClient {
     return (items.first['cena'] as num).toDouble();
   }
 
+  Map<DateTime, double> _parseGoldSeries(dynamic json) {
+    final items = json as List<dynamic>;
+    final series = <DateTime, double>{};
+
+    for (final item in items) {
+      final map = item as Map<String, dynamic>;
+      final date = DateTime.parse(map['data'] as String).toUtc();
+      final normalized = _normalizeDate(date);
+      series[normalized] = (map['cena'] as num).toDouble();
+    }
+
+    return series;
+  }
+
   String _formatDate(DateTime date) =>
       DateFormat('yyyy-MM-dd').format(date.toUtc());
+
+  DateTime _normalizeDate(DateTime date) =>
+      DateTime.utc(date.year, date.month, date.day);
 }
 
 class _NbpNotFoundException implements Exception {

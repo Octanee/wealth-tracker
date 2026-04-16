@@ -79,6 +79,36 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
     }
   }
 
+  @override
+  Future<Map<DateTime, double>> getGoldPriceSeriesPerGram({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final start = _normalizeDate(startDate);
+    final end = _normalizeDate(endDate);
+    if (start.isAfter(end)) return {};
+
+    try {
+      final series = await _apiClient.getGoldPriceSeriesPerGram(
+        startDate: start,
+        endDate: end,
+      );
+      for (final entry in series.entries) {
+        _preferences.setDouble(
+          _cacheKey('gold', 'pln-per-gram', entry.key),
+          entry.value,
+        );
+      }
+      if (series.isNotEmpty) {
+        return series;
+      }
+    } catch (_) {
+      // Fall through to cached lookup.
+    }
+
+    return _readCachedGoldSeries(start: start, end: end);
+  }
+
   Future<double> _fetchExchangeRate({
     required String fromCurrency,
     required String toCurrency,
@@ -110,5 +140,26 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
         '${normalizedDate.month.toString().padLeft(2, '0')}-'
         '${normalizedDate.day.toString().padLeft(2, '0')}';
     return 'nbp.$prefix.$key.$datePart';
+  }
+
+  DateTime _normalizeDate(DateTime date) =>
+      DateTime.utc(date.year, date.month, date.day);
+
+  Map<DateTime, double> _readCachedGoldSeries({
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final result = <DateTime, double>{};
+    var cursor = start;
+    while (!cursor.isAfter(end)) {
+      final cached = _preferences.getDouble(
+        _cacheKey('gold', 'pln-per-gram', cursor),
+      );
+      if (cached != null) {
+        result[cursor] = cached;
+      }
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return result;
   }
 }
