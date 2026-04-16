@@ -26,16 +26,16 @@ class MainShell extends StatelessWidget {
         final isDesktop = constraints.maxWidth >= 768;
         return isDesktop
             ? _DesktopLayout(
-                child: child,
                 destinations: _destinations,
                 currentIndex: index,
                 onDestinationSelected: (i) => context.go(_routes[i]),
+                child: child,
               )
             : _MobileLayout(
-                child: child,
                 destinations: _destinations,
                 currentIndex: index,
                 onDestinationSelected: (i) => context.go(_routes[i]),
+                child: child,
               );
       },
     );

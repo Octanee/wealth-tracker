@@ -29,18 +29,18 @@ class AppRouter {
       routes: [
         GoRoute(
           path: '/login',
-          builder: (_, __) => const LoginPage(),
+          builder: (_, _) => const LoginPage(),
         ),
         ShellRoute(
-          builder: (_, __, child) => MainShell(child: child),
+          builder: (_, _, child) => MainShell(child: child),
           routes: [
             GoRoute(
               path: '/dashboard',
-              builder: (_, __) => const DashboardPage(),
+              builder: (_, _) => const DashboardPage(),
             ),
             GoRoute(
               path: '/assets',
-              builder: (_, __) => const AssetsPage(),
+              builder: (_, _) => const AssetsPage(),
               routes: [
                 GoRoute(
                   path: ':id',
@@ -53,7 +53,7 @@ class AppRouter {
             ),
             GoRoute(
               path: '/settings',
-              builder: (_, __) => const SettingsPage(),
+              builder: (_, _) => const SettingsPage(),
             ),
           ],
         ),

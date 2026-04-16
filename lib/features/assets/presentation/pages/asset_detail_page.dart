@@ -364,7 +364,7 @@ class _LineChartPainter extends CustomPainter {
     double xStep = size.width / (points.length - 1).toDouble();
     if (points.length == 1) xStep = size.width / 2;
 
-    Offset _toOffset(int index, double value) {
+    Offset toOffset(int index, double value) {
       final x = points.length == 1 ? size.width / 2 : index * xStep;
       final y =
           size.height -
@@ -378,8 +378,8 @@ class _LineChartPainter extends CustomPainter {
     fillPath.moveTo(0, size.height);
     for (int i = 0; i < points.length; i++) {
       fillPath.lineTo(
-        _toOffset(i, points[i].value).dx,
-        _toOffset(i, points[i].value).dy,
+        toOffset(i, points[i].value).dx,
+        toOffset(i, points[i].value).dy,
       );
     }
     fillPath.lineTo(size.width, size.height);
@@ -408,16 +408,17 @@ class _LineChartPainter extends CustomPainter {
 
     final path = Path();
     for (int i = 0; i < points.length; i++) {
-      final offset = _toOffset(i, points[i].value);
-      if (i == 0)
+      final offset = toOffset(i, points[i].value);
+      if (i == 0) {
         path.moveTo(offset.dx, offset.dy);
-      else
+      } else {
         path.lineTo(offset.dx, offset.dy);
+      }
     }
     canvas.drawPath(path, linePaint);
 
     // Last point dot
-    final lastOffset = _toOffset(points.length - 1, points.last.value);
+    final lastOffset = toOffset(points.length - 1, points.last.value);
     canvas.drawCircle(lastOffset, 5, Paint()..color = AppColors.primary);
     canvas.drawCircle(lastOffset, 3, Paint()..color = Colors.white);
   }

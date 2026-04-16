@@ -90,10 +90,12 @@ class AuthCubit extends Cubit<AuthState> {
     if (msg.contains('wrong-password')) return 'Nieprawidłowe hasło';
     if (msg.contains('email-already-in-use')) return 'E-mail jest już zajęty';
     if (msg.contains('invalid-email')) return 'Nieprawidłowy adres e-mail';
-    if (msg.contains('weak-password'))
+    if (msg.contains('weak-password')) {
       return 'Hasło jest za słabe (min. 6 znaków)';
-    if (msg.contains('network-request-failed'))
+    }
+    if (msg.contains('network-request-failed')) {
       return 'Brak połączenia z internetem';
+    }
     if (msg.contains('cancelled')) return 'Logowanie anulowane';
     return 'Wystąpił błąd. Spróbuj ponownie.';
   }
