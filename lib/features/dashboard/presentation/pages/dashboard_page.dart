@@ -524,7 +524,12 @@ class _AssetsSummarySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        ...state.assets
+        ...(List<Asset>.from(state.assets)
+              ..sort((a, b) {
+                final aVal = a.latestSnapshot?.value ?? -1;
+                final bVal = b.latestSnapshot?.value ?? -1;
+                return bVal.compareTo(aVal);
+              }))
             .take(5)
             .map(
               (asset) => _DashboardAssetRow(
