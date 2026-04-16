@@ -106,9 +106,7 @@ class _AddEntrySheetState extends State<AddEntrySheet> {
                   // Allow only digits and at most one decimal separator.
                   // Optional decimal part is limited by maxDecimalPlaces.
                   final validPattern = RegExp(
-                    '^\\d+([\\.,]\\d{0,' +
-                        widget.maxDecimalPlaces.toString() +
-                        '})?',
+                    '^\\d+([\\.,]\\d{0,${widget.maxDecimalPlaces}})?',
                   );
                   final match = validPattern.matchAsPrefix(text);
                   if (match != null && match.end == text.length) {

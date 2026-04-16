@@ -81,12 +81,14 @@ class PortfolioValuationService {
     DateTime? minDate;
 
     for (final asset in assets) {
-      final createdAt = _normalize(asset.createdAt);
-      allDates.add(createdAt);
-      if (minDate == null || createdAt.isBefore(minDate)) {
-        minDate = createdAt;
+      final entries = entriesByAsset[asset.id] ?? const <AssetEntry>[];
+      final startDate = _effectiveStartDate(asset, entries);
+      allDates.add(startDate);
+      if (minDate == null || startDate.isBefore(minDate)) {
+        minDate = startDate;
       }
-      for (final entry in entriesByAsset[asset.id] ?? const <AssetEntry>[]) {
+
+      for (final entry in entries) {
         final recordedAt = _normalize(entry.recordedAt);
         allDates.add(recordedAt);
         if (minDate == null || recordedAt.isBefore(minDate)) {
@@ -154,8 +156,8 @@ class PortfolioValuationService {
     DateTime date, {
     double? latestGoldPricePln,
   }) async {
-    final normalizedCreatedAt = _normalize(asset.createdAt);
-    if (date.isBefore(normalizedCreatedAt)) return null;
+    final startDate = _effectiveStartDate(asset, entries);
+    if (date.isBefore(startDate)) return null;
 
     if (asset.config case MetalAssetConfig(:final quantityGrams)) {
       if (latestGoldPricePln == null) return null;
@@ -202,6 +204,21 @@ class PortfolioValuationService {
     }
 
     return null;
+  }
+
+  DateTime _effectiveStartDate(Asset asset, List<AssetEntry> entries) {
+    if (entries.isEmpty) {
+      return _normalize(asset.createdAt);
+    }
+
+    DateTime? earliest;
+    for (final entry in entries) {
+      final entryDate = _normalize(entry.recordedAt);
+      if (earliest == null || entryDate.isBefore(earliest)) {
+        earliest = entryDate;
+      }
+    }
+    return earliest ?? _normalize(asset.createdAt);
   }
 
   DateTime _normalize(DateTime date) =>
