@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../domain/repositories/assets_repository.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_type.dart';
 import 'asset_detail_state.dart';
 
 class AssetDetailCubit extends Cubit<AssetDetailState> {
@@ -66,6 +67,62 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
       unawaited(_analytics.logEntryDeleted(assetId: _assetId!));
     } catch (e) {
       emit(AssetDetailError(e.toString()));
+    }
+  }
+
+  Future<String?> updateAsset({
+    required String name,
+    required AssetType type,
+    required String currency,
+    required String color,
+    String? description,
+  }) async {
+    if (_userId == null || _assetId == null) {
+      return 'Brak kontekstu użytkownika lub aktywa.';
+    }
+
+    final current = state;
+    if (current is! AssetDetailLoaded) {
+      return 'Szczegóły aktywa nie są jeszcze gotowe.';
+    }
+
+    final updated = current.asset.copyWith(
+      name: name,
+      type: type,
+      currency: currency,
+      color: color,
+      description: description,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    try {
+      await _repository.updateAsset(_userId!, updated);
+      emit(AssetDetailLoaded(asset: updated, entries: current.entries));
+      return null;
+    } catch (_) {
+      return 'Nie udało się zapisać zmian aktywa.';
+    }
+  }
+
+  Future<String?> archiveAsset() async {
+    if (_userId == null || _assetId == null) {
+      return 'Brak kontekstu użytkownika lub aktywa.';
+    }
+
+    final current = state;
+    String? assetType;
+    if (current is AssetDetailLoaded) {
+      assetType = current.asset.type.name;
+    }
+
+    try {
+      await _repository.archiveAsset(_userId!, _assetId!);
+      if (assetType != null) {
+        unawaited(_analytics.logAssetArchived(assetType: assetType));
+      }
+      return null;
+    } catch (_) {
+      return 'Nie udało się zarchiwizować aktywa.';
     }
   }
 

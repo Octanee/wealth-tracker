@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/assets_cubit.dart';
+import '../../domain/entities/asset.dart';
 import '../../domain/entities/asset_type.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 
+typedef SaveAssetCallback = Future<String?> Function({
+  required String name,
+  required AssetType type,
+  required String currency,
+  required String color,
+  String? description,
+});
+
 class AddAssetSheet extends StatefulWidget {
-  const AddAssetSheet({super.key});
+  const AddAssetSheet({
+    super.key,
+    this.initialAsset,
+    this.onSubmit,
+  });
+
+  final Asset? initialAsset;
+  final SaveAssetCallback? onSubmit;
 
   @override
   State<AddAssetSheet> createState() => _AddAssetSheetState();
@@ -30,6 +46,21 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
     AssetType.other: '#64748B',
   };
 
+  bool get _isEditMode => widget.initialAsset != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialAsset;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      _descController.text = initial.description ?? '';
+      _selectedType = initial.type;
+      _selectedCurrency = initial.currency;
+      _selectedColor = initial.color;
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -50,8 +81,14 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
           children: [
             Row(
               children: [
-                const Text('Nowe aktywo',
-                    style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(
+                  _isEditMode ? 'Edytuj aktywo' : 'Nowe aktywo',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close, color: AppColors.textSecondary),
@@ -148,7 +185,7 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
               child: _isLoading
                   ? const SizedBox(height: 20, width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Dodaj aktywo'),
+                  : Text(_isEditMode ? 'Zapisz zmiany' : 'Dodaj aktywo'),
             ),
           ],
         ),
@@ -159,13 +196,38 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await context.read<AssetsCubit>().addAsset(
-      name: _nameController.text.trim(),
-      type: _selectedType,
-      currency: _selectedCurrency,
-      color: _selectedColor,
-      description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-    );
-    if (mounted) Navigator.of(context).pop();
+    final name = _nameController.text.trim();
+    final description = _descController.text.trim().isEmpty
+        ? null
+        : _descController.text.trim();
+
+    String? error;
+    if (widget.onSubmit != null) {
+      error = await widget.onSubmit!(
+        name: name,
+        type: _selectedType,
+        currency: _selectedCurrency,
+        color: _selectedColor,
+        description: description,
+      );
+    } else {
+      await context.read<AssetsCubit>().addAsset(
+        name: name,
+        type: _selectedType,
+        currency: _selectedCurrency,
+        color: _selectedColor,
+        description: description,
+      );
+    }
+
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+    }
+    setState(() => _isLoading = false);
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/asset_entry.dart';
 import '../cubit/asset_detail_cubit.dart';
 import '../cubit/asset_detail_state.dart';
 import '../widgets/add_entry_sheet.dart';
+import '../widgets/add_asset_sheet.dart';
 import '../widgets/asset_type_badge.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -47,17 +49,48 @@ class _AssetDetailView extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(asset.name),
+        title: BlocBuilder<AssetDetailCubit, AssetDetailState>(
+          builder: (_, state) {
+            final currentAsset =
+                state is AssetDetailLoaded ? state.asset : asset;
+            return Text(currentAsset.name);
+          },
+        ),
         actions: [
           BlocBuilder<AssetDetailCubit, AssetDetailState>(
-            builder: (context, state) => IconButton(
-              icon: const Icon(
-                Icons.add_circle_outline,
-                color: AppColors.primary,
-              ),
-              tooltip: 'Dodaj wpis',
-              onPressed: () => _showAddEntry(context),
-            ),
+            builder: (context, state) {
+              final currentAsset =
+                  state is AssetDetailLoaded ? state.asset : asset;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    tooltip: 'Edytuj aktywo',
+                    onPressed: () => _showEditAsset(context, currentAsset),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.archive_outlined,
+                      color: AppColors.negative,
+                    ),
+                    tooltip: 'Archiwizuj aktywo',
+                    onPressed: () => _archiveAsset(context),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add_circle_outline,
+                      color: AppColors.primary,
+                    ),
+                    tooltip: 'Dodaj wpis',
+                    onPressed: () => _showAddEntry(context, currentAsset),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -79,9 +112,9 @@ class _AssetDetailView extends StatelessWidget {
           if (state is AssetDetailLoaded) {
             return _LoadedView(
               state: state,
-              asset: asset,
-              onAddEntry: () => _showAddEntry(context),
-              onEditEntry: (entry) => _showEditEntry(context, entry),
+              asset: state.asset,
+              onAddEntry: () => _showAddEntry(context, state.asset),
+              onEditEntry: (entry) => _showEditEntry(context, entry, state.asset),
             );
           }
           return const SizedBox.shrink();
@@ -90,30 +123,96 @@ class _AssetDetailView extends StatelessWidget {
     );
   }
 
-  void _showAddEntry(BuildContext context) {
+  void _showAddEntry(BuildContext context, Asset currentAsset) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: context.read<AssetDetailCubit>(),
-        child: AddEntrySheet(currency: asset.currency),
+        child: AddEntrySheet(currency: currentAsset.currency),
       ),
     );
   }
 
-  Future<void> _showEditEntry(BuildContext context, AssetEntry entry) async {
+  Future<void> _showEditEntry(
+    BuildContext context,
+    AssetEntry entry,
+    Asset currentAsset,
+  ) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: context.read<AssetDetailCubit>(),
         child: AddEntrySheet(
-          currency: asset.currency,
+          currency: currentAsset.currency,
           initialEntry: entry,
           lockDate: true,
         ),
       ),
     );
+  }
+
+  Future<void> _showEditAsset(BuildContext context, Asset currentAsset) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => AddAssetSheet(
+        initialAsset: currentAsset,
+        onSubmit: ({
+          required name,
+          required type,
+          required currency,
+          required color,
+          description,
+        }) => context.read<AssetDetailCubit>().updateAsset(
+          name: name,
+          type: type,
+          currency: currency,
+          color: color,
+          description: description,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _archiveAsset(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Archiwizować aktywo?'),
+        content: const Text(
+          'Aktywo zniknie z listy aktywnych, ale dane pozostaną w historii.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Anuluj'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Archiwizuj',
+              style: TextStyle(color: AppColors.negative),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final error = await context.read<AssetDetailCubit>().archiveAsset();
+    if (!context.mounted) return;
+
+    if (error == null) {
+      context.pop();
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error)));
   }
 }
 
