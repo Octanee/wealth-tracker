@@ -21,15 +21,18 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Ustawienia', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
+        title: const Text(
+          'Ustawienia',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+        ),
       ),
       body: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           final user = state is SettingsLoaded
               ? state.user
               : state is SettingsSaving
-                  ? state.user
-                  : null;
+              ? state.user
+              : null;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -38,7 +41,11 @@ class SettingsPage extends StatelessWidget {
               children: [
                 if (user != null) _ProfileCard(user: user),
                 const SizedBox(height: 20),
-                if (user != null) _CurrencySection(user: user, isSaving: state is SettingsSaving),
+                if (user != null)
+                  _CurrencySection(
+                    user: user,
+                    isSaving: state is SettingsSaving,
+                  ),
                 const SizedBox(height: 20),
                 _AboutSection(),
                 const SizedBox(height: 20),
@@ -80,7 +87,11 @@ class _ProfileCard extends StatelessWidget {
                         ? user.displayName![0]
                         : user.email[0])
                     .toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
@@ -92,12 +103,18 @@ class _ProfileCard extends StatelessWidget {
                 Text(
                   user.displayName ?? 'Użytkownik',
                   style: const TextStyle(
-                      color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   user.email,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -127,21 +144,28 @@ class _CurrencySection extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Waluta bazowa',
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Waluta bazowa',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Wybierz walutę, w której chcesz widzieć sumaryczny majątek (nie wymusza przeliczania).',
+              'Wybierz walutę, w której mają być przeliczane wartości w dashboardzie i widokach aktywów.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: isSaving
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  )
                 : DropdownButtonFormField<String>(
                     initialValue: user.baseCurrency,
                     dropdownColor: AppColors.cardBg,
@@ -149,11 +173,15 @@ class _CurrencySection extends StatelessWidget {
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.currency_exchange, size: 18),
                     ),
-                    items: AppConstants.supportedCurrencies
-                        .map((c) => DropdownMenuItem(
-                              value: c,
-                              child: Text('$c  ${AppConstants.currencySymbols[c] ?? ''}'),
-                            ))
+                    items: AppConstants.nbpSupportedCurrencies
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                              '$c  ${AppConstants.currencySymbols[c] ?? ''}',
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) {
                       if (v != null) {
@@ -179,11 +207,23 @@ class _AboutSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _InfoTile(icon: Icons.info_outline, label: 'Wersja aplikacji', value: '1.0.0 MVP'),
+          _InfoTile(
+            icon: Icons.info_outline,
+            label: 'Wersja aplikacji',
+            value: '1.0.0 MVP',
+          ),
           const Divider(height: 1),
-          _InfoTile(icon: Icons.security_outlined, label: 'Dane', value: 'Przechowywane w Firebase'),
+          _InfoTile(
+            icon: Icons.security_outlined,
+            label: 'Dane',
+            value: 'Przechowywane w Firebase',
+          ),
           const Divider(height: 1),
-          _InfoTile(icon: Icons.lock_outline, label: 'Prywatność', value: 'Tylko Twoje dane'),
+          _InfoTile(
+            icon: Icons.lock_outline,
+            label: 'Prywatność',
+            value: 'Tylko Twoje dane',
+          ),
         ],
       ),
     );
@@ -191,7 +231,11 @@ class _AboutSection extends StatelessWidget {
 }
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.icon, required this.label, required this.value});
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -205,9 +249,21 @@ class _InfoTile extends StatelessWidget {
           Icon(icon, color: AppColors.textMuted, size: 18),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(label, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
+            ),
           ),
-          Text(value, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );
@@ -225,10 +281,17 @@ class _LogoutButton extends StatelessWidget {
             title: const Text('Wylogowanie'),
             content: const Text('Czy na pewno chcesz się wylogować?'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
               TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Wyloguj', style: TextStyle(color: AppColors.negative))),
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Anuluj'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Wyloguj',
+                  style: TextStyle(color: AppColors.negative),
+                ),
+              ),
             ],
           ),
         );
@@ -237,7 +300,10 @@ class _LogoutButton extends StatelessWidget {
         }
       },
       icon: const Icon(Icons.logout, color: AppColors.negative),
-      label: const Text('Wyloguj się', style: TextStyle(color: AppColors.negative)),
+      label: const Text(
+        'Wyloguj się',
+        style: TextStyle(color: AppColors.negative),
+      ),
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: AppColors.negativeSurface),
       ),

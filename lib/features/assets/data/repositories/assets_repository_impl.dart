@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_entry.dart';
 import '../../domain/entities/asset_type.dart';
+import '../models/asset_config_model.dart';
 import '../../domain/repositories/assets_repository.dart';
 import '../models/asset_model.dart';
 import '../models/asset_entry_model.dart';
@@ -91,6 +93,7 @@ class AssetsRepositoryImpl implements AssetsRepository {
     required String currency,
     required String color,
     String? description,
+    AssetConfig? config,
   }) async {
     final id = _uuid.v4();
     final now = DateTime.now().toUtc();
@@ -104,6 +107,7 @@ class AssetsRepositoryImpl implements AssetsRepository {
       isArchived: false,
       createdAt: now,
       updatedAt: now,
+      config: config,
     );
     await _assetsCol(userId).doc(id).set(model.toFirestore());
     return model.toDomain();
@@ -125,6 +129,7 @@ class AssetsRepositoryImpl implements AssetsRepository {
       'currency': asset.currency,
       'color': asset.color,
       'description': asset.description,
+      'config': AssetConfigModel.toFirestore(asset.config),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

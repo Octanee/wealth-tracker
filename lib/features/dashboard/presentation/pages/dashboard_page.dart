@@ -12,6 +12,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
 import '../../../../features/auth/presentation/cubit/auth_state.dart';
+import '../../../../features/market_data/domain/entities/asset_valuation.dart';
 import '../../../../shared/widgets/trend_badge.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -31,7 +32,10 @@ class _DashboardPageState extends State<DashboardPage> {
   void _load() {
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
-      context.read<DashboardCubit>().loadDashboard(authState.user.uid);
+      context.read<DashboardCubit>().loadDashboard(
+        authState.user.uid,
+        authState.user.baseCurrency,
+      );
     }
   }
 
@@ -69,10 +73,16 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       body: BlocListener<AuthCubit, AuthState>(
         listenWhen: (previous, current) =>
-            previous is! AuthAuthenticated && current is AuthAuthenticated,
+            current is AuthAuthenticated &&
+            (previous is! AuthAuthenticated ||
+                previous.user.uid != current.user.uid ||
+                previous.user.baseCurrency != current.user.baseCurrency),
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            context.read<DashboardCubit>().loadDashboard(state.user.uid);
+            context.read<DashboardCubit>().loadDashboard(
+              state.user.uid,
+              state.user.baseCurrency,
+            );
           }
         },
         child: BlocBuilder<DashboardCubit, DashboardState>(
@@ -124,12 +134,10 @@ class _DashboardContent extends StatelessWidget {
   const _DashboardContent({required this.state});
   final DashboardLoaded state;
 
-  Map<String, List<ChartPoint>> get _historyWithEnoughData {
+  List<ChartPoint> get _historyWithEnoughData {
     final history = state.portfolioHistory;
-    if (history == null || history.isEmpty) return const {};
-    return Map.fromEntries(
-      history.entries.where((entry) => entry.value.length >= 2),
-    );
+    if (history == null || history.length < 2) return const [];
+    return history;
   }
 
   @override
@@ -140,7 +148,9 @@ class _DashboardContent extends StatelessWidget {
       onRefresh: () async {
         final authState = context.read<AuthCubit>().state;
         if (authState is AuthAuthenticated) {
-          await context.read<DashboardCubit>().reloadHistory(authState.user.uid);
+          await context.read<DashboardCubit>().reloadHistory(
+            authState.user.uid,
+          );
         }
       },
       child: SingleChildScrollView(
@@ -153,16 +163,18 @@ class _DashboardContent extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _TotalWealthSection(totalByCurrency: state.totalByCurrency),
+              _TotalWealthSection(
+                totalValue: state.totalValue,
+                baseCurrency: state.baseCurrency,
+                hasUnconvertedAssets: state.hasUnconvertedAssets,
+              ),
               const SizedBox(height: 20),
               if (_historyWithEnoughData.isNotEmpty) ...[
-                for (final entry in _historyWithEnoughData.entries) ...[
-                  PortfolioHistoryChart(
-                    points: entry.value,
-                    currency: entry.key,
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                PortfolioHistoryChart(
+                  points: _historyWithEnoughData,
+                  currency: state.baseCurrency,
+                ),
+                const SizedBox(height: 20),
               ],
               if (state.assetsWithValue.isNotEmpty) ...[
                 _AllocationSection(state: state),
@@ -179,12 +191,19 @@ class _DashboardContent extends StatelessWidget {
 }
 
 class _TotalWealthSection extends StatelessWidget {
-  const _TotalWealthSection({required this.totalByCurrency});
-  final Map<String, double> totalByCurrency;
+  const _TotalWealthSection({
+    required this.totalValue,
+    required this.baseCurrency,
+    required this.hasUnconvertedAssets,
+  });
+
+  final double totalValue;
+  final String baseCurrency;
+  final bool hasUnconvertedAssets;
 
   @override
   Widget build(BuildContext context) {
-    if (totalByCurrency.isEmpty) {
+    if (totalValue == 0) {
       return _EmptyDashboard();
     }
     return Container(
@@ -210,21 +229,24 @@ class _TotalWealthSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ...totalByCurrency.entries.map(
-            (e) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                CurrencyFormatter.format(e.value, e.key),
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
+          Text(
+            CurrencyFormatter.format(totalValue, baseCurrency),
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
             ),
           ),
           const SizedBox(height: 8),
+          if (hasUnconvertedAssets)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Część aktywów nie została uwzględniona z powodu braku kursu NBP.',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+            ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -507,6 +529,8 @@ class _AssetsSummarySection extends StatelessWidget {
             .map(
               (asset) => _DashboardAssetRow(
                 asset: asset,
+                valuation: state.valuationsByAssetId[asset.id],
+                baseCurrency: state.baseCurrency,
                 onTap: () => context.go('/assets/${asset.id}', extra: asset),
               ),
             ),
@@ -516,8 +540,16 @@ class _AssetsSummarySection extends StatelessWidget {
 }
 
 class _DashboardAssetRow extends StatelessWidget {
-  const _DashboardAssetRow({required this.asset, required this.onTap});
+  const _DashboardAssetRow({
+    required this.asset,
+    required this.baseCurrency,
+    required this.onTap,
+    this.valuation,
+  });
+
   final Asset asset;
+  final String baseCurrency;
+  final AssetValuation? valuation;
   final VoidCallback onTap;
 
   Color get _typeColor {
@@ -608,14 +640,36 @@ class _DashboardAssetRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (snapshot != null)
-              Text(
-                CurrencyFormatter.formatCompact(snapshot.value, asset.currency),
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                ),
+            if (valuation != null || snapshot != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    valuation != null
+                        ? CurrencyFormatter.formatCompact(
+                            valuation!.nativeValue,
+                            valuation!.nativeCurrency,
+                          )
+                        : CurrencyFormatter.formatCompact(
+                            snapshot!.value,
+                            asset.currency,
+                          ),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  if (valuation?.baseValue != null &&
+                      valuation!.nativeCurrency != baseCurrency)
+                    Text(
+                      '≈ ${CurrencyFormatter.formatCompact(valuation!.baseValue!, baseCurrency)}',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                ],
               )
             else
               const Text('—', style: TextStyle(color: AppColors.textMuted)),

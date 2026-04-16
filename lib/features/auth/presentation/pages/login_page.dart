@@ -34,7 +34,10 @@ class _LoginPageState extends State<LoginPage> {
         listener: (context, state) {
           if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: AppColors.negative),
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.negative,
+              ),
             );
           }
         },
@@ -135,10 +138,13 @@ class _LoginPageState extends State<LoginPage> {
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
                   color: AppColors.textMuted,
                 ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Wymagane';
@@ -244,7 +250,9 @@ class _LoginPageState extends State<LoginPage> {
           child: Text(
             _isRegister ? 'Zaloguj się' : 'Zarejestruj się',
             style: const TextStyle(
-                color: AppColors.primary, fontWeight: FontWeight.w600),
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -256,12 +264,15 @@ class _LoginPageState extends State<LoginPage> {
     final cubit = context.read<AuthCubit>();
     if (_isRegister) {
       cubit.register(
-          _emailController.text.trim(),
-          _passwordController.text,
-          _nameController.text.trim());
+        _emailController.text.trim(),
+        _passwordController.text,
+        _nameController.text.trim(),
+      );
     } else {
       cubit.signInWithEmail(
-          _emailController.text.trim(), _passwordController.text);
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
     }
   }
 }
@@ -287,7 +298,10 @@ class _GoogleLogoPainter extends CustomPainter {
     paint.color = const Color(0xFF4285F4);
     canvas.drawArc(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      -0.5, 3.3, true, paint,
+      -0.5,
+      3.3,
+      true,
+      paint,
     );
     paint.color = Colors.white;
     canvas.drawCircle(
@@ -297,7 +311,12 @@ class _GoogleLogoPainter extends CustomPainter {
     );
     paint.color = const Color(0xFF4285F4);
     canvas.drawRect(
-      Rect.fromLTWH(size.width / 2, size.height * 0.35, size.width / 2, size.height * 0.3),
+      Rect.fromLTWH(
+        size.width / 2,
+        size.height * 0.35,
+        size.width / 2,
+        size.height * 0.3,
+      ),
       paint,
     );
   }

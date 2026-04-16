@@ -1,4 +1,5 @@
 import '../entities/asset.dart';
+import '../entities/asset_config.dart';
 import '../entities/asset_entry.dart';
 import '../entities/asset_type.dart';
 
@@ -17,6 +18,7 @@ abstract class AssetsRepository {
     required String currency,
     required String color,
     String? description,
+    AssetConfig? config,
   });
 
   /// Archive asset (soft delete)

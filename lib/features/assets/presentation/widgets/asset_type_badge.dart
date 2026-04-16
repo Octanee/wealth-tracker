@@ -10,12 +10,18 @@ class AssetTypeBadge extends StatelessWidget {
 
   Color get _color {
     switch (type) {
-      case AssetType.bank:   return AppColors.assetBank;
-      case AssetType.broker: return AppColors.assetBroker;
-      case AssetType.crypto: return AppColors.assetCrypto;
-      case AssetType.metal:  return AppColors.assetMetal;
-      case AssetType.cash:   return AppColors.assetCash;
-      case AssetType.other:  return AppColors.assetOther;
+      case AssetType.bank:
+        return AppColors.assetBank;
+      case AssetType.broker:
+        return AppColors.assetBroker;
+      case AssetType.crypto:
+        return AppColors.assetCrypto;
+      case AssetType.metal:
+        return AppColors.assetMetal;
+      case AssetType.cash:
+        return AppColors.assetCash;
+      case AssetType.other:
+        return AppColors.assetOther;
     }
   }
 

@@ -42,7 +42,10 @@ class _AssetsPageState extends State<AssetsPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: AppColors.primary,
+            ),
             tooltip: 'Dodaj aktywo',
             onPressed: () => _showAddAsset(context),
           ),

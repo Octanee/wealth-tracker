@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_entry.dart';
 import '../cubit/asset_detail_cubit.dart';
 import '../cubit/asset_detail_state.dart';
@@ -14,6 +15,7 @@ import '../../../../core/utils/date_formatter.dart';
 import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
 import '../../../../features/auth/presentation/cubit/auth_state.dart';
 import '../../../../features/dashboard/domain/calculators/wealth_calculator.dart';
+import '../../../../features/market_data/domain/entities/asset_valuation.dart';
 import '../../../../core/di/service_locator.dart';
 
 class AssetDetailPage extends StatelessWidget {
@@ -51,16 +53,18 @@ class _AssetDetailView extends StatelessWidget {
       appBar: AppBar(
         title: BlocBuilder<AssetDetailCubit, AssetDetailState>(
           builder: (_, state) {
-            final currentAsset =
-                state is AssetDetailLoaded ? state.asset : asset;
+            final currentAsset = state is AssetDetailLoaded
+                ? state.asset
+                : asset;
             return Text(currentAsset.name);
           },
         ),
         actions: [
           BlocBuilder<AssetDetailCubit, AssetDetailState>(
             builder: (context, state) {
-              final currentAsset =
-                  state is AssetDetailLoaded ? state.asset : asset;
+              final currentAsset = state is AssetDetailLoaded
+                  ? state.asset
+                  : asset;
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -86,7 +90,9 @@ class _AssetDetailView extends StatelessWidget {
                       color: AppColors.primary,
                     ),
                     tooltip: 'Dodaj wpis',
-                    onPressed: () => _showAddEntry(context, currentAsset),
+                    onPressed: currentAsset.type.allowsManualEntries
+                        ? () => _showAddEntry(context, currentAsset)
+                        : null,
                   ),
                 ],
               );
@@ -114,7 +120,8 @@ class _AssetDetailView extends StatelessWidget {
               state: state,
               asset: state.asset,
               onAddEntry: () => _showAddEntry(context, state.asset),
-              onEditEntry: (entry) => _showEditEntry(context, entry, state.asset),
+              onEditEntry: (entry) =>
+                  _showEditEntry(context, entry, state.asset),
             );
           }
           return const SizedBox.shrink();
@@ -159,19 +166,22 @@ class _AssetDetailView extends StatelessWidget {
       isScrollControlled: true,
       builder: (_) => AddAssetSheet(
         initialAsset: currentAsset,
-        onSubmit: ({
-          required name,
-          required type,
-          required currency,
-          required color,
-          description,
-        }) => context.read<AssetDetailCubit>().updateAsset(
-          name: name,
-          type: type,
-          currency: currency,
-          color: color,
-          description: description,
-        ),
+        onSubmit:
+            ({
+              required name,
+              required type,
+              required currency,
+              required color,
+              description,
+              config,
+            }) => context.read<AssetDetailCubit>().updateAsset(
+              name: name,
+              type: type,
+              currency: currency,
+              color: color,
+              description: description,
+              config: config,
+            ),
       ),
     );
   }
@@ -210,9 +220,7 @@ class _AssetDetailView extends StatelessWidget {
       return;
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(error)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 }
 
@@ -235,7 +243,7 @@ class _LoadedView extends StatelessWidget {
         SliverToBoxAdapter(
           child: _HeaderCard(state: state, asset: asset),
         ),
-        if (state.entries.isNotEmpty) ...[
+        if (state.entries.isNotEmpty && asset.type.allowsManualEntries) ...[
           SliverToBoxAdapter(
             child: _ChartSection(
               entries: state.entries,
@@ -267,7 +275,12 @@ class _LoadedView extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
         if (state.entries.isEmpty)
-          SliverFillRemaining(child: _EmptyEntries(onAdd: onAddEntry)),
+          SliverFillRemaining(
+            child: _EmptyEntries(
+              onAdd: onAddEntry,
+              allowsManualEntries: asset.type.allowsManualEntries,
+            ),
+          ),
       ],
     );
   }
@@ -280,6 +293,10 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    final baseCurrency = authState is AuthAuthenticated
+        ? authState.user.baseCurrency
+        : asset.currency;
     final hasChange = state.changeAbsolute != null;
     final isPositive = (state.changeAbsolute ?? 0) >= 0;
 
@@ -291,84 +308,137 @@ class _HeaderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: FutureBuilder<AssetValuation?>(
+        future: ServiceLocator.instance.assetValuationService.valuateAsset(
+          asset,
+          baseCurrency: baseCurrency,
+        ),
+        builder: (context, valuationSnapshot) {
+          final valuation = valuationSnapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AssetTypeBadge(type: asset.type),
-              const Spacer(),
+              Row(
+                children: [
+                  AssetTypeBadge(type: asset.type),
+                  const Spacer(),
+                  Text(
+                    asset.currency,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               Text(
-                asset.currency,
+                valuation != null
+                    ? CurrencyFormatter.format(
+                        valuation.nativeValue,
+                        valuation.nativeCurrency,
+                      )
+                    : '— brak danych',
                 style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            state.latestValue != null
-                ? CurrencyFormatter.format(state.latestValue!, asset.currency)
-                : '— brak danych',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
-          ),
-          if (hasChange) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  isPositive ? Icons.trending_up : Icons.trending_down,
-                  size: 16,
-                  color: isPositive ? AppColors.positive : AppColors.negative,
-                ),
-                const SizedBox(width: 4),
+              if (valuation?.baseValue != null &&
+                  valuation!.nativeCurrency != baseCurrency) ...[
+                const SizedBox(height: 6),
                 Text(
-                  CurrencyFormatter.formatChange(
-                    state.changeAbsolute!,
-                    asset.currency,
-                  ),
-                  style: TextStyle(
-                    color: isPositive ? AppColors.positive : AppColors.negative,
-                    fontWeight: FontWeight.w600,
+                  '≈ ${CurrencyFormatter.format(valuation.baseValue!, baseCurrency)}',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
                     fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '(${CurrencyFormatter.formatPercent(state.changePercent!)})',
-                  style: TextStyle(
-                    color: isPositive ? AppColors.positive : AppColors.negative,
-                    fontSize: 13,
-                  ),
+              ],
+              const SizedBox(height: 10),
+              Text(
+                _configDescription(asset),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
                 ),
-                const Spacer(),
+              ),
+              if (hasChange) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      isPositive ? Icons.trending_up : Icons.trending_down,
+                      size: 16,
+                      color: isPositive
+                          ? AppColors.positive
+                          : AppColors.negative,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      CurrencyFormatter.formatChange(
+                        state.changeAbsolute!,
+                        asset.currency,
+                      ),
+                      style: TextStyle(
+                        color: isPositive
+                            ? AppColors.positive
+                            : AppColors.negative,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '(${CurrencyFormatter.formatPercent(state.changePercent!)})',
+                      style: TextStyle(
+                        color: isPositive
+                            ? AppColors.positive
+                            : AppColors.negative,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'vs poprzedni wpis',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (state.entries.isNotEmpty) ...[
+                const SizedBox(height: 8),
                 Text(
-                  'vs poprzedni wpis',
+                  'Ostatni wpis: ${DateFormatter.dateOnly(state.entries.first.recordedAt)}',
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
               ],
-            ),
-          ],
-          if (state.entries.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Ostatni wpis: ${DateFormatter.dateOnly(state.entries.first.recordedAt)}',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-            ),
-          ],
-        ],
+            ],
+          );
+        },
       ),
     );
+  }
+
+  String _configDescription(Asset asset) {
+    if (asset.config case MetalAssetConfig(:final quantityGrams)) {
+      return 'Złoto: ${quantityGrams.toStringAsFixed(2)} g, wycena z API NBP.';
+    }
+    if (asset.config case CashAssetConfig(:final cashAmount)) {
+      return 'Saldo konfiguracyjne: ${CurrencyFormatter.format(cashAmount, asset.currency)}';
+    }
+    return asset.type.allowsManualEntries
+        ? 'Bieżąca wartość wynika z ostatniego wpisu.'
+        : 'Wartość aktywa jest wyliczana automatycznie.';
   }
 }
 
@@ -643,8 +713,10 @@ class _EntryTile extends StatelessWidget {
 }
 
 class _EmptyEntries extends StatelessWidget {
-  const _EmptyEntries({required this.onAdd});
+  const _EmptyEntries({required this.onAdd, required this.allowsManualEntries});
+
   final VoidCallback onAdd;
+  final bool allowsManualEntries;
 
   @override
   Widget build(BuildContext context) {
@@ -663,16 +735,24 @@ class _EmptyEntries extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Dodaj pierwszy wpis, aby rozpocząć śledzenie.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          Text(
+            allowsManualEntries
+                ? 'Dodaj pierwszy wpis, aby rozpocząć śledzenie.'
+                : 'To aktywo jest wyceniane automatycznie na podstawie konfiguracji i kursów NBP.',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text('Dodaj wpis'),
-          ),
+          if (allowsManualEntries) ...[
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text('Dodaj wpis'),
+            ),
+          ],
         ],
       ),
     );

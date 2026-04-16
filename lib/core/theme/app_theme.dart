@@ -68,8 +68,10 @@ class AppTheme {
         ),
         labelStyle: const TextStyle(color: AppColors.textSecondary),
         hintStyle: const TextStyle(color: AppColors.textMuted),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -114,9 +116,14 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         selectedIconTheme: IconThemeData(color: AppColors.primary),
         unselectedIconTheme: IconThemeData(color: AppColors.textSecondary),
-        selectedLabelTextStyle: TextStyle(color: AppColors.primary, fontSize: 12),
-        unselectedLabelTextStyle:
-            TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        selectedLabelTextStyle: TextStyle(
+          color: AppColors.primary,
+          fontSize: 12,
+        ),
+        unselectedLabelTextStyle: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+        ),
         useIndicator: true,
         indicatorColor: AppColors.primarySurface,
       ),
@@ -131,7 +138,11 @@ class AppTheme {
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600);
+            return const TextStyle(
+              color: AppColors.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            );
           }
           return const TextStyle(color: AppColors.textSecondary, fontSize: 12);
         }),
@@ -169,27 +180,60 @@ class AppTheme {
     try {
       return GoogleFonts.interTextTheme(base).copyWith(
         displayLarge: GoogleFonts.inter(
-            fontSize: 36, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          fontSize: 36,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
         displayMedium: GoogleFonts.inter(
-            fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
         headlineLarge: GoogleFonts.inter(
-            fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
         headlineMedium: GoogleFonts.inter(
-            fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         headlineSmall: GoogleFonts.inter(
-            fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         titleLarge: GoogleFonts.inter(
-            fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
         titleMedium: GoogleFonts.inter(
-            fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary,
+        ),
         bodyLarge: GoogleFonts.inter(
-            fontSize: 15, fontWeight: FontWeight.w400, color: AppColors.textPrimary),
+          fontSize: 15,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textPrimary,
+        ),
         bodyMedium: GoogleFonts.inter(
-            fontSize: 13, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary,
+        ),
         bodySmall: GoogleFonts.inter(
-            fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted),
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textMuted,
+        ),
         labelLarge: GoogleFonts.inter(
-            fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
       );
     } catch (_) {
       return base;

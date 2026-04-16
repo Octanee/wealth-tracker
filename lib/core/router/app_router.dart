@@ -27,10 +27,7 @@ class AppRouter {
         return null;
       },
       routes: [
-        GoRoute(
-          path: '/login',
-          builder: (_, _) => const LoginPage(),
-        ),
+        GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
         ShellRoute(
           builder: (_, _, child) => MainShell(child: child),
           routes: [
@@ -51,10 +48,7 @@ class AppRouter {
                 ),
               ],
             ),
-            GoRoute(
-              path: '/settings',
-              builder: (_, _) => const SettingsPage(),
-            ),
+            GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
           ],
         ),
       ],

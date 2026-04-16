@@ -11,8 +11,16 @@ class CurrencyFormatter {
 
     // Crypto/metals go after value, traditional before
     const suffixCurrencies = {
-      'PLN', 'CZK', 'HUF', 'NOK', 'SEK', 'DKK',
-      'BTC', 'ETH', 'XAU', 'XAG',
+      'PLN',
+      'CZK',
+      'HUF',
+      'NOK',
+      'SEK',
+      'DKK',
+      'BTC',
+      'ETH',
+      'XAU',
+      'XAG',
     };
 
     if (suffixCurrencies.contains(currency)) {
@@ -34,8 +42,16 @@ class CurrencyFormatter {
     }
 
     const suffixCurrencies = {
-      'PLN', 'CZK', 'HUF', 'NOK', 'SEK', 'DKK',
-      'BTC', 'ETH', 'XAU', 'XAG',
+      'PLN',
+      'CZK',
+      'HUF',
+      'NOK',
+      'SEK',
+      'DKK',
+      'BTC',
+      'ETH',
+      'XAU',
+      'XAG',
     };
 
     if (suffixCurrencies.contains(currency)) {

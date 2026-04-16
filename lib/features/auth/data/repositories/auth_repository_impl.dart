@@ -20,9 +20,38 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Stream<UserEntity?> get authStateChanges {
-    return _auth.authStateChanges().asyncMap((user) async {
-      if (user == null) return null;
-      return _fetchOrCreateUser(user);
+    return _auth.authStateChanges().asyncExpand((user) async* {
+      if (user == null) {
+        yield null;
+        return;
+      }
+
+      final existing = await _users.doc(user.uid).get();
+      if (!existing.exists) {
+        await _createUserDocument(user);
+      }
+
+      yield* _users.doc(user.uid).snapshots().map((doc) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) {
+          return UserEntity(
+            uid: user.uid,
+            email: user.email ?? '',
+            displayName: user.displayName,
+            photoUrl: user.photoURL,
+            baseCurrency: AppConstants.defaultBaseCurrency,
+          );
+        }
+        return UserEntity(
+          uid: user.uid,
+          email: user.email ?? '',
+          displayName: user.displayName ?? data['displayName'] as String?,
+          photoUrl: user.photoURL,
+          baseCurrency:
+              data['baseCurrency'] as String? ??
+              AppConstants.defaultBaseCurrency,
+        );
+      });
     });
   }
 
@@ -133,14 +162,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<UserEntity> _fetchOrCreateUser(User firebaseUser) async {
     final doc = await _users.doc(firebaseUser.uid).get();
     if (!doc.exists) {
-      final data = {
-        'displayName': firebaseUser.displayName ?? '',
-        'email': firebaseUser.email ?? '',
-        'baseCurrency': AppConstants.defaultBaseCurrency,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      await _users.doc(firebaseUser.uid).set(data);
+      await _createUserDocument(firebaseUser);
       return UserEntity(
         uid: firebaseUser.uid,
         email: firebaseUser.email ?? '',
@@ -158,5 +180,16 @@ class AuthRepositoryImpl implements AuthRepository {
       baseCurrency:
           data['baseCurrency'] as String? ?? AppConstants.defaultBaseCurrency,
     );
+  }
+
+  Future<void> _createUserDocument(User firebaseUser) {
+    final data = {
+      'displayName': firebaseUser.displayName ?? '',
+      'email': firebaseUser.email ?? '',
+      'baseCurrency': AppConstants.defaultBaseCurrency,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    return _users.doc(firebaseUser.uid).set(data);
   }
 }

@@ -1,5 +1,12 @@
 import 'package:equatable/equatable.dart';
+import 'asset_config.dart';
 import 'asset_type.dart';
+
+const _assetFieldUnset = _AssetFieldUnset();
+
+class _AssetFieldUnset {
+  const _AssetFieldUnset();
+}
 
 class Asset extends Equatable {
   const Asset({
@@ -14,6 +21,7 @@ class Asset extends Equatable {
     required this.updatedAt,
     this.latestSnapshot,
     this.previousSnapshot,
+    this.config,
   });
 
   final String id;
@@ -27,17 +35,25 @@ class Asset extends Equatable {
   final DateTime updatedAt;
   final LatestSnapshot? latestSnapshot;
   final LatestSnapshot? previousSnapshot;
+  final AssetConfig? config;
+
+  CashAssetConfig? get cashConfig =>
+      config is CashAssetConfig ? config as CashAssetConfig : null;
+
+  MetalAssetConfig? get metalConfig =>
+      config is MetalAssetConfig ? config as MetalAssetConfig : null;
 
   Asset copyWith({
     String? name,
     AssetType? type,
     String? currency,
     String? color,
-    String? description,
+    Object? description = _assetFieldUnset,
     bool? isArchived,
     DateTime? updatedAt,
     LatestSnapshot? latestSnapshot,
     LatestSnapshot? previousSnapshot,
+    Object? config = _assetFieldUnset,
   }) {
     return Asset(
       id: id,
@@ -45,12 +61,17 @@ class Asset extends Equatable {
       type: type ?? this.type,
       currency: currency ?? this.currency,
       color: color ?? this.color,
-      description: description ?? this.description,
+      description: identical(description, _assetFieldUnset)
+          ? this.description
+          : description as String?,
       isArchived: isArchived ?? this.isArchived,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       latestSnapshot: latestSnapshot ?? this.latestSnapshot,
       previousSnapshot: previousSnapshot ?? this.previousSnapshot,
+      config: identical(config, _assetFieldUnset)
+          ? this.config
+          : config as AssetConfig?,
     );
   }
 
@@ -67,6 +88,7 @@ class Asset extends Equatable {
     updatedAt,
     latestSnapshot,
     previousSnapshot,
+    config,
   ];
 }
 

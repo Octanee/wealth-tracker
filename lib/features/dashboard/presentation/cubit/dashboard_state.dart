@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../../assets/domain/entities/asset.dart';
+import '../../../market_data/domain/entities/asset_valuation.dart';
 import '../../domain/calculators/wealth_calculator.dart';
 
 abstract class DashboardState extends Equatable {
@@ -19,32 +20,41 @@ class DashboardLoading extends DashboardState {
 class DashboardLoaded extends DashboardState {
   const DashboardLoaded({
     required this.assets,
-    required this.totalByCurrency,
+    required this.baseCurrency,
+    required this.totalValue,
+    required this.valuationsByAssetId,
     required this.allocationPercents,
     this.portfolioHistory,
   });
 
   final List<Asset> assets;
-  final Map<String, double> totalByCurrency;
+  final String baseCurrency;
+  final double totalValue;
+  final Map<String, AssetValuation> valuationsByAssetId;
   final Map<String, double> allocationPercents; // assetId → %
-  /// null = history still loading; empty map = no entries yet
-  final Map<String, List<ChartPoint>>? portfolioHistory;
+  /// null = history still loading; empty = no points yet
+  final List<ChartPoint>? portfolioHistory;
 
   List<Asset> get assetsWithValue =>
-      assets.where((a) => a.latestSnapshot != null).toList();
+      assets.where((a) => valuationsByAssetId.containsKey(a.id)).toList();
 
-  DashboardLoaded withHistory(Map<String, List<ChartPoint>> history) =>
-      DashboardLoaded(
-        assets: assets,
-        totalByCurrency: totalByCurrency,
-        allocationPercents: allocationPercents,
-        portfolioHistory: history,
-      );
+  bool get hasUnconvertedAssets => assetsWithValue.length != assets.length;
+
+  DashboardLoaded withHistory(List<ChartPoint> history) => DashboardLoaded(
+    assets: assets,
+    baseCurrency: baseCurrency,
+    totalValue: totalValue,
+    valuationsByAssetId: valuationsByAssetId,
+    allocationPercents: allocationPercents,
+    portfolioHistory: history,
+  );
 
   @override
   List<Object?> get props => [
     assets,
-    totalByCurrency,
+    baseCurrency,
+    totalValue,
+    valuationsByAssetId,
     allocationPercents,
     portfolioHistory,
   ];

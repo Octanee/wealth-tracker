@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/repositories/assets_repository.dart';
 import '../../domain/entities/asset_type.dart';
 import 'assets_state.dart';
@@ -37,6 +38,7 @@ class AssetsCubit extends Cubit<AssetsState> {
     required String currency,
     required String color,
     String? description,
+    AssetConfig? config,
   }) async {
     if (_userId == null) return;
     try {
@@ -47,6 +49,7 @@ class AssetsCubit extends Cubit<AssetsState> {
         currency: currency,
         color: color,
         description: description,
+        config: config,
       );
       unawaited(_analytics.logAssetCreated(assetType: type.name));
       // Stream listener will update state automatically

@@ -15,7 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initializeDateFormatting('pl_PL', null);
-  ServiceLocator.instance.setup();
+  await ServiceLocator.instance.setup();
   runApp(const WealthLensApp());
 }
 
@@ -43,6 +43,7 @@ class WealthLensApp extends StatelessWidget {
         BlocProvider(
           create: (_) => DashboardCubit(
             repository: sl.assetsRepository,
+            portfolioValuationService: sl.portfolioValuationService,
             analytics: sl.analyticsService,
           ),
         ),

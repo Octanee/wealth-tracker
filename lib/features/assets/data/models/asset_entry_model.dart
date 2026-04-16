@@ -31,18 +31,18 @@ class AssetEntryModel {
   }
 
   Map<String, dynamic> toFirestore() => {
-        'value': value,
-        if (note != null && note!.isNotEmpty) 'note': note,
-        'recordedAt': Timestamp.fromDate(recordedAt),
-        'createdAt': Timestamp.fromDate(createdAt),
-      };
+    'value': value,
+    if (note != null && note!.isNotEmpty) 'note': note,
+    'recordedAt': Timestamp.fromDate(recordedAt),
+    'createdAt': Timestamp.fromDate(createdAt),
+  };
 
   AssetEntry toDomain() => AssetEntry(
-        id: id,
-        assetId: assetId,
-        value: value,
-        note: note,
-        recordedAt: recordedAt,
-        createdAt: createdAt,
-      );
+    id: id,
+    assetId: assetId,
+    value: value,
+    note: note,
+    recordedAt: recordedAt,
+    createdAt: createdAt,
+  );
 }

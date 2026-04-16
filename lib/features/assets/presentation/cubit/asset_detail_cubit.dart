@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../domain/repositories/assets_repository.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_type.dart';
 import 'asset_detail_state.dart';
 
@@ -76,6 +77,7 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
     required String currency,
     required String color,
     String? description,
+    AssetConfig? config,
   }) async {
     if (_userId == null || _assetId == null) {
       return 'Brak kontekstu użytkownika lub aktywa.';
@@ -92,6 +94,7 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
       currency: currency,
       color: color,
       description: description,
+      config: config,
       updatedAt: DateTime.now().toUtc(),
     );
 

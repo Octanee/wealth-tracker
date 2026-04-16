@@ -24,7 +24,9 @@ class WealthCalculator {
     for (final asset in assets) {
       if (asset.latestSnapshot == null) continue;
       final total = totals[asset.currency] ?? 0;
-      result[asset.id] = total == 0 ? 0 : (asset.latestSnapshot!.value / total) * 100;
+      result[asset.id] = total == 0
+          ? 0
+          : (asset.latestSnapshot!.value / total) * 100;
     }
     return result;
   }

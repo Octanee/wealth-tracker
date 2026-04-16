@@ -46,4 +46,11 @@ enum AssetType {
       orElse: () => AssetType.other,
     );
   }
+
+  bool get supportsCashBalanceConfig =>
+      this == AssetType.bank || this == AssetType.broker;
+
+  bool get supportsMetalConfig => this == AssetType.metal;
+
+  bool get allowsManualEntries => this != AssetType.metal;
 }

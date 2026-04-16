@@ -1,96 +1,86 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
+import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/repositories/assets_repository.dart';
-import '../../../dashboard/domain/calculators/wealth_calculator.dart';
+import '../../../market_data/domain/services/portfolio_valuation_service.dart';
 import 'dashboard_state.dart';
 
 class DashboardCubit extends Cubit<DashboardState> {
   DashboardCubit({
     required AssetsRepository repository,
+    required PortfolioValuationService portfolioValuationService,
     required AnalyticsService analytics,
   }) : _repository = repository,
+       _portfolioValuationService = portfolioValuationService,
        _analytics = analytics,
        super(const DashboardInitial());
 
   final AssetsRepository _repository;
+  final PortfolioValuationService _portfolioValuationService;
   final AnalyticsService _analytics;
   StreamSubscription? _sub;
   String? _userId;
-  Set<String>? _lastAssetIds;
+  String? _baseCurrency;
+  List<Asset> _assets = const [];
+  int _loadVersion = 0;
 
-  void loadDashboard(String userId) {
-    if (_userId == userId) return;
+  void loadDashboard(String userId, String baseCurrency) {
+    final sameUser = _userId == userId;
     _userId = userId;
-    _lastAssetIds = null;
-    emit(const DashboardLoading());
-    _sub?.cancel();
-    _sub = _repository.watchAssets(userId).listen((assets) {
-      final totals = WealthCalculator.totalByCurrency(assets);
-      final allocs = WealthCalculator.allocationPercents(assets);
-      unawaited(_analytics.logDashboardViewed(assetsCount: assets.length));
+    _baseCurrency = baseCurrency;
 
-      // Preserve existing history to avoid flickering null
-      final currentHistory =
-          state is DashboardLoaded
-              ? (state as DashboardLoaded).portfolioHistory
-              : null;
+    if (!sameUser) {
+      emit(const DashboardLoading());
+      _sub?.cancel();
+      _sub = _repository.watchAssets(userId).listen((assets) {
+        _assets = assets;
+        unawaited(_refreshDashboard());
+      }, onError: (e) => emit(DashboardError(e.toString())));
+      return;
+    }
+
+    unawaited(_refreshDashboard());
+  }
+
+  Future<void> reloadHistory(String userId) async {
+    if (_userId != userId) return;
+    await _refreshDashboard();
+  }
+
+  Future<void> _refreshDashboard() async {
+    if (_userId == null || _baseCurrency == null) return;
+
+    final version = ++_loadVersion;
+    try {
+      final assets = List<Asset>.from(_assets);
+      final entriesByAsset = await _repository.getAllEntries(
+        _userId!,
+        assets.map((asset) => asset.id).toList(),
+      );
+      final result = await _portfolioValuationService.build(
+        assets: assets,
+        baseCurrency: _baseCurrency!,
+        entriesByAsset: entriesByAsset,
+      );
+      if (version != _loadVersion) return;
 
       emit(
         DashboardLoaded(
           assets: assets,
-          totalByCurrency: totals,
-          allocationPercents: allocs,
-          portfolioHistory: currentHistory,
+          baseCurrency: _baseCurrency!,
+          totalValue: result.totalValue,
+          valuationsByAssetId: result.valuationsByAssetId,
+          allocationPercents: result.allocationPercents,
+          portfolioHistory: result.history,
         ),
       );
-
-      // Re-fetch history only when asset set changes
-      final newIds = assets.map((a) => a.id).toSet();
-      if (_lastAssetIds == null || !_setsEqual(_lastAssetIds!, newIds)) {
-        _lastAssetIds = newIds;
-        unawaited(
-          _loadPortfolioHistory(userId, assets.map((a) => a.id).toList()),
-        );
-      }
-    }, onError: (e) => emit(DashboardError(e.toString())));
-  }
-
-  Future<void> reloadHistory(String userId) async {
-    if (state is! DashboardLoaded) return;
-    final assetIds =
-        (state as DashboardLoaded).assets.map((a) => a.id).toList();
-    _lastAssetIds = null;
-    await _loadPortfolioHistory(userId, assetIds);
-  }
-
-  Future<void> _loadPortfolioHistory(
-    String userId,
-    List<String> assetIds,
-  ) async {
-    if (state is! DashboardLoaded) return;
-    try {
-      final entriesByAsset =
-          await _repository.getAllEntries(userId, assetIds);
-      if (state is! DashboardLoaded) return;
-      final loaded = state as DashboardLoaded;
-      final history = WealthCalculator.portfolioHistory(
-        loaded.assets,
-        entriesByAsset,
-      );
-      if (state is DashboardLoaded) {
-        emit((state as DashboardLoaded).withHistory(history));
-      }
-    } catch (_) {
-      // History is non-critical; silently emit empty map so UI stops loading
-      if (state is DashboardLoaded) {
-        emit((state as DashboardLoaded).withHistory({}));
-      }
+      unawaited(_analytics.logDashboardViewed(assetsCount: assets.length));
+    } catch (e) {
+      if (version != _loadVersion) return;
+      emit(DashboardError(e.toString()));
     }
   }
-
-  static bool _setsEqual(Set<String> a, Set<String> b) =>
-      a.length == b.length && a.containsAll(b);
 
   @override
   Future<void> close() {

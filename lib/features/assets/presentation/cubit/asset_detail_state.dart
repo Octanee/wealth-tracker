@@ -23,8 +23,7 @@ class AssetDetailLoaded extends AssetDetailState {
 
   double? get latestValue => entries.isEmpty ? null : entries.first.value;
 
-  double? get previousValue =>
-      entries.length < 2 ? null : entries[1].value;
+  double? get previousValue => entries.length < 2 ? null : entries[1].value;
 
   double? get changeAbsolute {
     if (latestValue == null || previousValue == null) return null;

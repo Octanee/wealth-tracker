@@ -39,8 +39,9 @@ class _PortfolioHistoryChartState extends State<PortfolioHistoryChart> {
       return widget.points;
     }
     final cutoff = DateTime.now().subtract(Duration(days: _range.days));
-    final filtered =
-        widget.points.where((p) => p.date.isAfter(cutoff)).toList();
+    final filtered = widget.points
+        .where((p) => p.date.isAfter(cutoff))
+        .toList();
     return filtered.isEmpty ? widget.points.take(1).toList() : filtered;
   }
 
@@ -163,12 +164,7 @@ class _PortfolioHistoryChartState extends State<PortfolioHistoryChart> {
     }
 
     final spots = points
-        .map(
-          (p) => FlSpot(
-            p.date.millisecondsSinceEpoch.toDouble(),
-            p.value,
-          ),
-        )
+        .map((p) => FlSpot(p.date.millisecondsSinceEpoch.toDouble(), p.value))
         .toList();
 
     final values = points.map((p) => p.value).toList();
@@ -256,10 +252,7 @@ class _PortfolioHistoryChartState extends State<PortfolioHistoryChart> {
               final date = DateTime.fromMillisecondsSinceEpoch(s.x.toInt());
               return LineTooltipItem(
                 '${DateFormatter.dateOnly(date)}\n',
-                const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 10,
-                ),
+                const TextStyle(color: AppColors.textSecondary, fontSize: 10),
                 children: [
                   TextSpan(
                     text: CurrencyFormatter.format(s.y, widget.currency),
@@ -328,8 +321,7 @@ class _RangeSelector extends StatelessWidget {
                 color: isSelected ? AppColors.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color:
-                      isSelected ? AppColors.primary : AppColors.divider,
+                  color: isSelected ? AppColors.primary : AppColors.divider,
                 ),
               ),
               child: Text(

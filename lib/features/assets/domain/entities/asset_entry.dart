@@ -15,7 +15,7 @@ class AssetEntry extends Equatable {
   final double value;
   final String? note;
   final DateTime recordedAt; // date chosen by user
-  final DateTime createdAt;  // technical write timestamp
+  final DateTime createdAt; // technical write timestamp
 
   @override
   List<Object?> get props => [id, assetId, value, note, recordedAt, createdAt];

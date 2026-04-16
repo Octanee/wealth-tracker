@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'asset_config_model.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_type.dart';
 
 class AssetModel {
@@ -15,6 +17,7 @@ class AssetModel {
     required this.updatedAt,
     this.latestSnapshot,
     this.previousSnapshot,
+    this.config,
   });
 
   final String id;
@@ -28,9 +31,11 @@ class AssetModel {
   final DateTime updatedAt;
   final LatestSnapshotModel? latestSnapshot;
   final LatestSnapshotModel? previousSnapshot;
+  final AssetConfig? config;
 
   factory AssetModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final assetType = AssetType.fromString(data['type'] as String);
     return AssetModel(
       id: doc.id,
       name: data['name'] as String,
@@ -51,6 +56,7 @@ class AssetModel {
               data['previousSnapshot'] as Map<String, dynamic>,
             )
           : null,
+      config: AssetConfigModel.fromFirestore(assetType, data['config']),
     );
   }
 
@@ -65,6 +71,7 @@ class AssetModel {
     'updatedAt': Timestamp.fromDate(updatedAt),
     'latestSnapshot': latestSnapshot?.toMap(),
     'previousSnapshot': previousSnapshot?.toMap(),
+    if (config != null) 'config': AssetConfigModel.toFirestore(config),
   };
 
   Asset toDomain() => Asset(
@@ -79,6 +86,7 @@ class AssetModel {
     updatedAt: updatedAt,
     latestSnapshot: latestSnapshot?.toDomain(),
     previousSnapshot: previousSnapshot?.toDomain(),
+    config: config,
   );
 }
 

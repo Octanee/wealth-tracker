@@ -10,9 +10,21 @@ class MainShell extends StatelessWidget {
   static const _routes = ['/dashboard', '/assets', '/settings'];
 
   static const _destinations = [
-    _NavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Dashboard'),
-    _NavItem(icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet, label: 'Aktywa'),
-    _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Ustawienia'),
+    _NavItem(
+      icon: Icons.dashboard_outlined,
+      activeIcon: Icons.dashboard,
+      label: 'Dashboard',
+    ),
+    _NavItem(
+      icon: Icons.account_balance_wallet_outlined,
+      activeIcon: Icons.account_balance_wallet,
+      label: 'Aktywa',
+    ),
+    _NavItem(
+      icon: Icons.settings_outlined,
+      activeIcon: Icons.settings,
+      label: 'Ustawienia',
+    ),
   ];
 
   @override
@@ -67,11 +79,13 @@ class _MobileLayout extends StatelessWidget {
           selectedIndex: currentIndex,
           onDestinationSelected: onDestinationSelected,
           destinations: destinations
-              .map((d) => NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.activeIcon),
-                    label: d.label,
-                  ))
+              .map(
+                (d) => NavigationDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.activeIcon),
+                  label: d.label,
+                ),
+              )
               .toList(),
         ),
       ),
@@ -109,11 +123,13 @@ class _DesktopLayout extends StatelessWidget {
               minExtendedWidth: 220,
               leading: const _NavRailHeader(),
               destinations: destinations
-                  .map((d) => NavigationRailDestination(
-                        icon: Icon(d.icon),
-                        selectedIcon: Icon(d.activeIcon),
-                        label: Text(d.label),
-                      ))
+                  .map(
+                    (d) => NavigationRailDestination(
+                      icon: Icon(d.icon),
+                      selectedIcon: Icon(d.activeIcon),
+                      label: Text(d.label),
+                    ),
+                  )
                   .toList(),
             ),
           ),
@@ -158,7 +174,11 @@ class _NavRailHeader extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem({required this.icon, required this.activeIcon, required this.label});
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
   final IconData icon;
   final IconData activeIcon;
   final String label;

@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_type.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../../../features/auth/presentation/cubit/auth_state.dart';
+import '../../../../features/market_data/domain/entities/asset_valuation.dart';
 import '../../../../shared/widgets/trend_badge.dart';
 import 'asset_type_badge.dart';
 
@@ -32,9 +38,13 @@ class AssetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    final baseCurrency = authState is AuthAuthenticated
+        ? authState.user.baseCurrency
+        : asset.currency;
     final snapshot = asset.latestSnapshot;
     final previousSnapshot = asset.previousSnapshot;
-    final hasValue = snapshot != null;
+    final hasValue = snapshot != null || asset.config != null;
     final hasTrend = snapshot != null && previousSnapshot != null;
     final previousValue = previousSnapshot?.value ?? 0.0;
     final change = hasTrend ? snapshot.value - previousSnapshot.value : 0.0;
@@ -44,55 +54,71 @@ class AssetTile extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
+      child: FutureBuilder<AssetValuation?>(
+        future: ServiceLocator.instance.assetValuationService.valuateAsset(
+          asset,
+          baseCurrency: baseCurrency,
+        ),
+        builder: (context, valuationSnapshot) {
+          final valuation = valuationSnapshot.data;
+          return InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Row(
-            children: [
-              // Type icon circle
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _typeColor.withAlpha(30),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    asset.type.icon,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.divider),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      asset.name,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _typeColor.withAlpha(30),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
+                    child: Center(
+                      child: Text(
+                        asset.type.icon,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AssetTypeBadge(type: asset.type, compact: true),
-                        const SizedBox(width: 6),
                         Text(
-                          asset.currency,
+                          asset.name,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            AssetTypeBadge(type: asset.type, compact: true),
+                            const SizedBox(width: 6),
+                            Text(
+                              asset.currency,
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _secondaryLabel(asset),
                           style: const TextStyle(
                             color: AppColors.textMuted,
                             fontSize: 12,
@@ -100,63 +126,90 @@ class AssetTile extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    hasValue
-                        ? CurrencyFormatter.formatCompact(
-                            snapshot.value,
-                            asset.currency,
-                          )
-                        : '—',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
                   ),
-                  if (hasValue)
-                    Text(
-                      DateFormatter.relative(snapshot.recordedAt),
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12,
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        valuation != null
+                            ? CurrencyFormatter.formatCompact(
+                                valuation.nativeValue,
+                                valuation.nativeCurrency,
+                              )
+                            : '—',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
-                    )
-                  else
-                    const Text(
-                      'Brak wpisów',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  if (hasTrend) ...[
-                    const SizedBox(height: 6),
-                    TrendBadge(
-                      delta: change,
-                      percent: percent,
-                      currency: asset.currency,
-                      compact: true,
-                    ),
-                  ],
+                      if (valuation?.baseValue != null &&
+                          valuation!.nativeCurrency != baseCurrency)
+                        Text(
+                          '≈ ${CurrencyFormatter.formatCompact(valuation.baseValue!, baseCurrency)}',
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        )
+                      else if (snapshot != null)
+                        Text(
+                          DateFormatter.relative(snapshot.recordedAt),
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        )
+                      else if (hasValue)
+                        const Text(
+                          'Wycena aktywna',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        )
+                      else
+                        const Text(
+                          'Brak wyceny',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (hasTrend) ...[
+                        const SizedBox(height: 6),
+                        TrendBadge(
+                          delta: change,
+                          percent: percent,
+                          currency: asset.currency,
+                          compact: true,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textMuted,
+                    size: 18,
+                  ),
                 ],
               ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.chevron_right,
-                color: AppColors.textMuted,
-                size: 18,
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
+  }
+
+  String _secondaryLabel(Asset asset) {
+    if (asset.config case MetalAssetConfig(:final quantityGrams)) {
+      return '${quantityGrams.toStringAsFixed(2)} g złota';
+    }
+    if (asset.config case CashAssetConfig(:final cashAmount)) {
+      return 'Saldo: ${CurrencyFormatter.formatCompact(cashAmount, asset.currency)}';
+    }
+    return 'Wartość natywna aktywa';
   }
 }

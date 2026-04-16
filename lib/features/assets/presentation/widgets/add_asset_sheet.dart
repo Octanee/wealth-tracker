@@ -2,24 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/assets_cubit.dart';
 import '../../domain/entities/asset.dart';
+import '../../domain/entities/asset_config.dart';
 import '../../domain/entities/asset_type.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 
-typedef SaveAssetCallback = Future<String?> Function({
-  required String name,
-  required AssetType type,
-  required String currency,
-  required String color,
-  String? description,
-});
+typedef SaveAssetCallback =
+    Future<String?> Function({
+      required String name,
+      required AssetType type,
+      required String currency,
+      required String color,
+      String? description,
+      AssetConfig? config,
+    });
 
 class AddAssetSheet extends StatefulWidget {
-  const AddAssetSheet({
-    super.key,
-    this.initialAsset,
-    this.onSubmit,
-  });
+  const AddAssetSheet({super.key, this.initialAsset, this.onSubmit});
 
   final Asset? initialAsset;
   final SaveAssetCallback? onSubmit;
@@ -32,7 +31,10 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _cashController = TextEditingController();
+  final _quantityController = TextEditingController();
   AssetType _selectedType = AssetType.bank;
+  PreciousMetalType _selectedMetalType = PreciousMetalType.gold;
   String _selectedCurrency = 'PLN';
   String _selectedColor = '#4F6EF7';
   bool _isLoading = false;
@@ -58,15 +60,31 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
       _selectedType = initial.type;
       _selectedCurrency = initial.currency;
       _selectedColor = initial.color;
+      if (initial.config case CashAssetConfig(:final cashAmount)) {
+        _cashController.text = cashAmount.toStringAsFixed(2);
+      }
+      if (initial.config case MetalAssetConfig(
+        :final metalType,
+        :final quantityGrams,
+      )) {
+        _selectedMetalType = metalType;
+        _quantityController.text = quantityGrams.toStringAsFixed(2);
+      }
     }
+    _ensureSelectedCurrencyIsSupported();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
+    _cashController.dispose();
+    _quantityController.dispose();
     super.dispose();
   }
+
+  List<String> get _availableCurrencies =>
+      AppConstants.currenciesForAssetType(_selectedType);
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +116,10 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
             ),
             const SizedBox(height: 20),
             // Type selector
-            const Text('Typ aktywa', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Typ aktywa',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -109,12 +130,18 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
                   onTap: () => setState(() {
                     _selectedType = type;
                     _selectedColor = _typeColors[type]!;
+                    _ensureSelectedCurrencyIsSupported();
                   }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: selected ? AppColors.primarySurface : AppColors.cardBgLight,
+                      color: selected
+                          ? AppColors.primarySurface
+                          : AppColors.cardBgLight,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: selected ? AppColors.primary : AppColors.divider,
@@ -129,9 +156,13 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
                         Text(
                           type.displayName,
                           style: TextStyle(
-                            color: selected ? AppColors.primary : AppColors.textSecondary,
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
                             fontSize: 13,
-                            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                           ),
                         ),
                       ],
@@ -161,15 +192,92 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
                 labelText: 'Waluta',
                 prefixIcon: Icon(Icons.currency_exchange, size: 20),
               ),
-              items: AppConstants.supportedCurrencies
-                  .map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text('$c  ${AppConstants.currencySymbols[c] ?? ''}'),
-                      ))
+              items: _availableCurrencies
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(
+                        '$c  ${AppConstants.currencySymbols[c] ?? ''}',
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => setState(() => _selectedCurrency = v!),
             ),
             const SizedBox(height: 14),
+            if (_selectedType.supportsCashBalanceConfig) ...[
+              TextFormField(
+                controller: _cashController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Gotówka / saldo',
+                  hintText: 'np. 12500.50',
+                  prefixIcon: Icon(Icons.savings_outlined, size: 20),
+                  helperText:
+                      'Ustawi bieżącą wartość aktywa, jeśli nie ma wpisów.',
+                  helperStyle: TextStyle(color: AppColors.textMuted),
+                ),
+                validator: (value) {
+                  if (!_selectedType.supportsCashBalanceConfig) return null;
+                  final parsed = _parseDecimal(value);
+                  if (parsed == null) return 'Podaj poprawną kwotę';
+                  if (parsed < 0) return 'Kwota nie może być ujemna';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+            ],
+            if (_selectedType.supportsMetalConfig) ...[
+              DropdownButtonFormField<PreciousMetalType>(
+                initialValue: _selectedMetalType,
+                dropdownColor: AppColors.cardBg,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Metal',
+                  prefixIcon: Icon(Icons.workspace_premium_outlined, size: 20),
+                ),
+                items: PreciousMetalType.values
+                    .map(
+                      (type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type.displayName),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedMetalType = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _quantityController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Ilość w gramach',
+                  hintText: 'np. 31.10',
+                  prefixIcon: Icon(Icons.scale_outlined, size: 20),
+                  helperText:
+                      'Wycena będzie pobierana automatycznie z API NBP.',
+                  helperStyle: TextStyle(color: AppColors.textMuted),
+                ),
+                validator: (value) {
+                  if (!_selectedType.supportsMetalConfig) return null;
+                  final parsed = _parseDecimal(value);
+                  if (parsed == null) return 'Podaj poprawną ilość';
+                  if (parsed <= 0) return 'Ilość musi być większa od zera';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+            ],
             TextFormField(
               controller: _descController,
               style: const TextStyle(color: AppColors.textPrimary),
@@ -183,8 +291,14 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
             ElevatedButton(
               onPressed: _isLoading ? null : _submit,
               child: _isLoading
-                  ? const SizedBox(height: 20, width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : Text(_isEditMode ? 'Zapisz zmiany' : 'Dodaj aktywo'),
             ),
           ],
@@ -200,6 +314,7 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
     final description = _descController.text.trim().isEmpty
         ? null
         : _descController.text.trim();
+    final config = _buildConfig();
 
     String? error;
     if (widget.onSubmit != null) {
@@ -209,6 +324,7 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
         currency: _selectedCurrency,
         color: _selectedColor,
         description: description,
+        config: config,
       );
     } else {
       await context.read<AssetsCubit>().addAsset(
@@ -217,6 +333,7 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
         currency: _selectedCurrency,
         color: _selectedColor,
         description: description,
+        config: config,
       );
     }
 
@@ -224,10 +341,41 @@ class _AddAssetSheetState extends State<AddAssetSheet> {
     if (error == null) {
       Navigator.of(context).pop();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
     }
     setState(() => _isLoading = false);
+  }
+
+  void _ensureSelectedCurrencyIsSupported() {
+    if (_availableCurrencies.contains(_selectedCurrency)) return;
+    _selectedCurrency = _availableCurrencies.first;
+  }
+
+  AssetConfig? _buildConfig() {
+    if (_selectedType.supportsCashBalanceConfig) {
+      final parsed = _parseDecimal(_cashController.text);
+      if (parsed != null) {
+        return CashAssetConfig(cashAmount: parsed);
+      }
+    }
+
+    if (_selectedType.supportsMetalConfig) {
+      final parsed = _parseDecimal(_quantityController.text);
+      if (parsed != null) {
+        return MetalAssetConfig(
+          metalType: _selectedMetalType,
+          quantityGrams: parsed,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  double? _parseDecimal(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return double.tryParse(value.trim().replaceAll(',', '.'));
   }
 }
