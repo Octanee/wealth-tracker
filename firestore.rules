@@ -21,7 +21,7 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 100
           && request.resource.data.isArchived == false;
         allow update: if isOwner(userId);
-        allow delete: if false; // use soft delete (isArchived)
+        allow delete: if isOwner(userId);
 
         // Value entries — separated from asset metadata
         match /entries/{entryId} {

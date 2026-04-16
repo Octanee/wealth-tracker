@@ -24,6 +24,9 @@ abstract class AssetsRepository {
   /// Archive asset (soft delete)
   Future<void> archiveAsset(String userId, String assetId);
 
+  /// Permanently delete asset together with its history entries
+  Future<void> deleteAsset(String userId, String assetId);
+
   /// Update asset metadata
   Future<void> updateAsset(String userId, Asset asset);
 

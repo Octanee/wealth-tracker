@@ -94,6 +94,30 @@ class _AssetDetailView extends StatelessWidget {
                         ? () => _showAddEntry(context, currentAsset)
                         : null,
                   ),
+                  PopupMenuButton<_AssetDetailAction>(
+                    tooltip: 'Więcej akcji',
+                    onSelected: (action) async {
+                      switch (action) {
+                        case _AssetDetailAction.archive:
+                          await _archiveAsset(context);
+                        case _AssetDetailAction.delete:
+                          await _deleteAsset(context);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<_AssetDetailAction>(
+                        value: _AssetDetailAction.archive,
+                        child: Text('Archiwizuj aktywo'),
+                      ),
+                      PopupMenuItem<_AssetDetailAction>(
+                        value: _AssetDetailAction.delete,
+                        child: Text(
+                          'Usuń aktywo',
+                          style: TextStyle(color: AppColors.negative),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               );
             },
@@ -222,7 +246,46 @@ class _AssetDetailView extends StatelessWidget {
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
+
+  Future<void> _deleteAsset(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Usunąć aktywo?'),
+        content: const Text(
+          'Ta operacja trwale usunie aktywo oraz całą historię jego wpisów. Nie można jej cofnąć.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Anuluj'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Usuń',
+              style: TextStyle(color: AppColors.negative),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final error = await context.read<AssetDetailCubit>().deleteAsset();
+    if (!context.mounted) return;
+
+    if (error == null) {
+      context.pop();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
 }
+
+enum _AssetDetailAction { archive, delete }
 
 class _LoadedView extends StatelessWidget {
   const _LoadedView({

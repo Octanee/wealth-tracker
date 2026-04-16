@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../domain/repositories/assets_repository.dart';
@@ -126,6 +127,33 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
       return null;
     } catch (_) {
       return 'Nie udało się zarchiwizować aktywa.';
+    }
+  }
+
+  Future<String?> deleteAsset() async {
+    if (_userId == null || _assetId == null) {
+      return 'Brak kontekstu użytkownika lub aktywa.';
+    }
+
+    final current = state;
+    String? assetType;
+    if (current is AssetDetailLoaded) {
+      assetType = current.asset.type.name;
+    }
+
+    try {
+      await _repository.deleteAsset(_userId!, _assetId!);
+      if (assetType != null) {
+        unawaited(_analytics.logAssetDeleted(assetType: assetType));
+      }
+      return null;
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') {
+        return 'Brak uprawnień do usunięcia aktywa. Zaktualizuj reguły Firestore.';
+      }
+      return 'Nie udało się usunąć aktywa.';
+    } catch (_) {
+      return 'Nie udało się usunąć aktywa.';
     }
   }
 

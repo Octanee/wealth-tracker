@@ -122,6 +122,24 @@ class AssetsRepositoryImpl implements AssetsRepository {
   }
 
   @override
+  Future<void> deleteAsset(String userId, String assetId) async {
+    while (true) {
+      final entriesSnap = await _entriesCol(userId, assetId).limit(400).get();
+      if (entriesSnap.docs.isEmpty) {
+        break;
+      }
+
+      final batch = _firestore.batch();
+      for (final doc in entriesSnap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+
+    await _assetsCol(userId).doc(assetId).delete();
+  }
+
+  @override
   Future<void> updateAsset(String userId, Asset asset) async {
     await _assetsCol(userId).doc(asset.id).update({
       'name': asset.name,

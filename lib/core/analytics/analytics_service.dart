@@ -51,6 +51,15 @@ class AnalyticsService {
     } catch (_) {}
   }
 
+  Future<void> logAssetDeleted({required String assetType}) async {
+    try {
+      await _analytics.logEvent(
+        name: 'asset_deleted',
+        parameters: {'asset_type': assetType},
+      );
+    } catch (_) {}
+  }
+
   Future<void> logEntryAdded({required String assetId}) async {
     try {
       await _analytics.logEvent(
