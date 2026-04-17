@@ -36,6 +36,27 @@ service cloud.firestore {
           allow delete: if isOwner(userId);
         }
       }
+
+      // Financial goals — portfolio-level and per-asset targets
+      match /goals/{goalId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasAll(['name', 'type', 'targetValue', 'targetCurrency', 'createdAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.type in ['portfolio', 'asset']
+          && request.resource.data.targetValue is number
+          && request.resource.data.targetValue > 0
+          && request.resource.data.targetCurrency is string;
+        allow update: if isOwner(userId)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.targetValue is number
+          && request.resource.data.targetValue > 0;
+        allow delete: if isOwner(userId);
+      }
     }
 
     // Deny all other access

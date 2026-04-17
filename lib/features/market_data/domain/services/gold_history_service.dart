@@ -56,8 +56,9 @@ class GoldHistoryService {
     final normalizedEntriesByAsset = <String, List<AssetEntry>>{};
 
     for (final asset in assets) {
-      final entries = List<AssetEntry>.from(entriesByAsset[asset.id] ?? const <AssetEntry>[])
-        ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+      final entries =
+          List<AssetEntry>.from(entriesByAsset[asset.id] ?? const <AssetEntry>[])
+            ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
       normalizedEntriesByAsset[asset.id] = entries;
 
       final startDate = _effectiveStartDate(asset, entries);
@@ -69,51 +70,89 @@ class GoldHistoryService {
     if (minDate == null || minDate.isAfter(normalizedEndDate)) {
       return const <ChartPoint>[];
     }
+    // Promote to non-nullable for use in closures below.
+    final effectiveMinDate = minDate;
 
-    final rawGoldSeries = await _assetValuationService.getGoldPriceSeriesPerGram(
-      startDate: minDate,
-      endDate: normalizedEndDate,
+    // ── Pre-fetch all data series in parallel ─────────────────────────────
+    // Collect unique non-PLN currencies needed for conversion.
+    final currencyCodes = <String>{};
+    for (final asset in assets) {
+      final code = asset.currency.toUpperCase();
+      if (code != 'PLN') currencyCodes.add(code);
+    }
+    final outputCode = outputCurrency.toUpperCase();
+    if (outputCode != 'PLN') currencyCodes.add(outputCode);
+
+    final fxSeriesByCode = <String, Map<DateTime, double>>{};
+
+    final futures = <Future>[
+      for (final code in currencyCodes)
+        _assetValuationService
+            .getExchangeRateSeriesToPln(
+              currencyCode: code,
+              startDate: effectiveMinDate,
+              endDate: normalizedEndDate,
+            )
+            .then((s) => fxSeriesByCode[code] = s),
+    ];
+
+    late final Map<DateTime, double> normalizedGoldSeries;
+    futures.add(
+      _assetValuationService
+          .getGoldPriceSeriesPerGram(
+            startDate: effectiveMinDate,
+            endDate: normalizedEndDate,
+          )
+          .then(
+            (raw) => normalizedGoldSeries = {
+              for (final e in raw.entries) _normalize(e.key): e.value,
+            },
+          ),
     );
 
-    final normalizedGoldSeries = <DateTime, double>{
-      for (final entry in rawGoldSeries.entries) _normalize(entry.key): entry.value,
-    };
+    await Future.wait(futures);
 
+    // ── Build chart points with forward-fill ──────────────────────────────
     final points = <ChartPoint>[];
+    // Forward-fill state.
+    final latestRateToPln = <String, double>{'PLN': 1.0};
     double? latestGoldPricePln;
 
-    for (DateTime date = minDate;
+    for (DateTime date = effectiveMinDate;
         !date.isAfter(normalizedEndDate);
         date = date.add(const Duration(days: 1))) {
       if (normalizedGoldSeries.containsKey(date)) {
         latestGoldPricePln = normalizedGoldSeries[date];
       }
-
-      if (latestGoldPricePln == null) {
-        continue;
+      for (final code in currencyCodes) {
+        final rate = fxSeriesByCode[code]?[date];
+        if (rate != null) latestRateToPln[code] = rate;
       }
+
+      if (latestGoldPricePln == null) continue;
 
       var totalValue = 0.0;
       var hasAnyValue = false;
 
       for (final asset in assets) {
-        final nativeValue = await _resolveNativeValueOnDate(
+        final nativeValue = _resolveNativeValueOnDateSync(
           asset,
           normalizedEntriesByAsset[asset.id] ?? const <AssetEntry>[],
           date,
           latestGoldPricePln: latestGoldPricePln,
+          latestRateToPln: latestRateToPln,
         );
         if (nativeValue == null) continue;
 
-        final converted = await _assetValuationService.convertAmount(
-          amount: nativeValue,
-          fromCurrency: asset.currency,
-          toCurrency: outputCurrency,
-          asOfDate: date,
+        // Convert asset.currency → outputCurrency synchronously.
+        final rate = _exchangeRateSync(
+          from: asset.currency.toUpperCase(),
+          to: outputCode,
+          latestRateToPln: latestRateToPln,
         );
-        if (converted == null) continue;
+        if (rate == null) continue;
 
-        totalValue += converted;
+        totalValue += nativeValue * rate;
         hasAnyValue = true;
       }
 
@@ -125,12 +164,13 @@ class GoldHistoryService {
     return points;
   }
 
-  Future<double?> _resolveNativeValueOnDate(
+  double? _resolveNativeValueOnDateSync(
     Asset asset,
     List<AssetEntry> entries,
     DateTime date, {
     required double latestGoldPricePln,
-  }) async {
+    required Map<String, double> latestRateToPln,
+  }) {
     if (!asset.isGoldAsset) return null;
 
     final startDate = _effectiveStartDate(asset, entries);
@@ -152,16 +192,26 @@ class GoldHistoryService {
     }
 
     final valueInPln = latestGoldPricePln * effectiveQuantityGrams;
-    if (asset.currency == 'PLN') {
-      return valueInPln;
-    }
+    if (asset.currency.toUpperCase() == 'PLN') return valueInPln;
 
-    return _assetValuationService.convertAmount(
-      amount: valueInPln,
-      fromCurrency: 'PLN',
-      toCurrency: asset.currency,
-      asOfDate: date,
-    );
+    // Convert PLN → asset.currency using latest known rate.
+    final assetCode = asset.currency.toUpperCase();
+    final rate = latestRateToPln[assetCode];
+    if (rate == null || rate == 0) return null;
+    return valueInPln / rate;
+  }
+
+  /// Returns the exchange rate from [from] to [to] using forward-filled PLN rates.
+  double? _exchangeRateSync({
+    required String from,
+    required String to,
+    required Map<String, double> latestRateToPln,
+  }) {
+    if (from == to) return 1.0;
+    final fromRate = from == 'PLN' ? 1.0 : latestRateToPln[from];
+    final toRate = to == 'PLN' ? 1.0 : latestRateToPln[to];
+    if (fromRate == null || toRate == null || toRate == 0) return null;
+    return fromRate / toRate;
   }
 
   DateTime _effectiveStartDate(Asset asset, List<AssetEntry> entries) {

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/repositories/assets_repository.dart';
+import '../../../dashboard/domain/calculators/wealth_calculator.dart';
 import '../../../market_data/domain/services/gold_history_service.dart';
 import '../../../market_data/domain/services/portfolio_valuation_service.dart';
 import 'dashboard_state.dart';
@@ -62,17 +63,26 @@ class DashboardCubit extends Cubit<DashboardState> {
         _userId!,
         assets.map((asset) => asset.id).toList(),
       );
-      final result = await _portfolioValuationService.build(
-        assets: assets,
-        baseCurrency: _baseCurrency!,
-        entriesByAsset: entriesByAsset,
-      );
-      final goldHistory = await _goldHistoryService.buildCombinedHistory(
-        assets: assets,
-        baseCurrency: _baseCurrency!,
-        entriesByAsset: entriesByAsset,
-      );
+
+      // Run portfolio valuation and gold history in parallel — they are
+      // independent computations that both call pre-cached services internally.
+      final results = await Future.wait([
+        _portfolioValuationService.build(
+          assets: assets,
+          baseCurrency: _baseCurrency!,
+          entriesByAsset: entriesByAsset,
+        ),
+        _goldHistoryService.buildCombinedHistory(
+          assets: assets,
+          baseCurrency: _baseCurrency!,
+          entriesByAsset: entriesByAsset,
+        ),
+      ]);
+
       if (version != _loadVersion) return;
+
+      final result = results[0] as PortfolioValuationResult;
+      final goldHistory = results[1] as List<ChartPoint>;
 
       emit(
         DashboardLoaded(

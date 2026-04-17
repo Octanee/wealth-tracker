@@ -73,6 +73,55 @@ class NbpApiClient {
     return series;
   }
 
+  /// Fetches the full time series of PLN mid-rates for [currencyCode] in the
+  /// given date range. Returns a map of normalized UTC dates to rate values.
+  /// Requests are chunked into 90-day windows to stay within NBP API limits.
+  Future<Map<DateTime, double>> getMidRateSeriesToPln(
+    String currencyCode, {
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final code = currencyCode.toUpperCase();
+    if (code == 'PLN') {
+      // Build a map with 1.0 for every date in range — no HTTP needed.
+      final start = _normalizeDate(startDate);
+      final end = _normalizeDate(endDate);
+      final result = <DateTime, double>{};
+      var cursor = start;
+      while (!cursor.isAfter(end)) {
+        result[cursor] = 1.0;
+        cursor = cursor.add(const Duration(days: 1));
+      }
+      return result;
+    }
+
+    final start = _normalizeDate(startDate);
+    final end = _normalizeDate(endDate);
+    if (start.isAfter(end)) return {};
+
+    final series = <DateTime, double>{};
+    var chunkStart = start;
+
+    while (!chunkStart.isAfter(end)) {
+      final chunkEndCandidate = chunkStart.add(const Duration(days: 90));
+      final chunkEnd = chunkEndCandidate.isAfter(end) ? end : chunkEndCandidate;
+
+      try {
+        final json = await _getJson(
+          '/exchangerates/rates/a/$code/${_formatDate(chunkStart)}/${_formatDate(chunkEnd)}/',
+        );
+        final chunk = _parseMidRateSeries(json);
+        series.addAll(chunk);
+      } on _NbpNotFoundException {
+        // No publication in selected window (e.g. all-weekend range).
+      }
+
+      chunkStart = chunkEnd.add(const Duration(days: 1));
+    }
+
+    return series;
+  }
+
   Future<double> _getMidRateToPlnFallback(String code, DateTime date) async {
     final startDate = date.subtract(const Duration(days: 7));
     final json = await _getJson(
@@ -144,6 +193,18 @@ class NbpApiClient {
       series[normalized] = (map['cena'] as num).toDouble();
     }
 
+    return series;
+  }
+
+  Map<DateTime, double> _parseMidRateSeries(dynamic json) {
+    final rates = (json['rates'] as List<dynamic>?) ?? const [];
+    final series = <DateTime, double>{};
+    for (final item in rates) {
+      final map = item as Map<String, dynamic>;
+      final date = DateTime.parse(map['effectiveDate'] as String).toUtc();
+      final normalized = _normalizeDate(date);
+      series[normalized] = (map['mid'] as num).toDouble();
+    }
     return series;
   }
 

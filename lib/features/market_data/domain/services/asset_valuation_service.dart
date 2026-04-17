@@ -62,6 +62,18 @@ class AssetValuationService {
     );
   }
 
+  Future<Map<DateTime, double>> getExchangeRateSeriesToPln({
+    required String currencyCode,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    return _ratesRepository.getExchangeRateSeriesToPln(
+      currencyCode: currencyCode,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
   Future<double?> resolveNativeValue(Asset asset, {DateTime? asOfDate}) async {
     if (asset.config case MetalAssetConfig(
       :final metalType,

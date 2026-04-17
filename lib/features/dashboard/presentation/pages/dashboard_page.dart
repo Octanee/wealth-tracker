@@ -14,6 +14,11 @@ import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
 import '../../../../features/auth/presentation/cubit/auth_state.dart';
 import '../../../../features/market_data/domain/entities/asset_valuation.dart';
 import '../../../../shared/widgets/trend_badge.dart';
+import '../../../../features/goals/presentation/cubit/goals_cubit.dart';
+import '../../../../features/goals/presentation/cubit/goals_state.dart';
+import '../../../../features/goals/domain/entities/goal_type.dart';
+import '../../../../features/goals/presentation/widgets/goal_progress_card.dart';
+import '../../../../features/goals/presentation/widgets/add_goal_sheet.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -36,6 +41,7 @@ class _DashboardPageState extends State<DashboardPage> {
         authState.user.uid,
         authState.user.baseCurrency,
       );
+      context.read<GoalsCubit>().loadGoals(authState.user.uid);
     }
   }
 
@@ -83,6 +89,7 @@ class _DashboardPageState extends State<DashboardPage> {
               state.user.uid,
               state.user.baseCurrency,
             );
+            context.read<GoalsCubit>().loadGoals(state.user.uid);
           }
         },
         child: BlocBuilder<DashboardCubit, DashboardState>(
@@ -175,18 +182,26 @@ class _DashboardContent extends StatelessWidget {
                 hasUnconvertedAssets: state.hasUnconvertedAssets,
               ),
               const SizedBox(height: 20),
+              _PortfolioGoalsSection(
+                totalValue: state.totalValue,
+                baseCurrency: state.baseCurrency,
+              ),
               if (_historyWithEnoughData.isNotEmpty) ...[
-                PortfolioHistoryChart(
-                  points: _historyWithEnoughData,
-                  currency: state.baseCurrency,
+                RepaintBoundary(
+                  child: PortfolioHistoryChart(
+                    points: _historyWithEnoughData,
+                    currency: state.baseCurrency,
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
               if (_goldHistory.isNotEmpty) ...[
-                PortfolioHistoryChart(
-                  points: _goldHistory,
-                  currency: state.baseCurrency,
-                  title: 'Historia złota',
+                RepaintBoundary(
+                  child: PortfolioHistoryChart(
+                    points: _goldHistory,
+                    currency: state.baseCurrency,
+                    title: 'Historia złota',
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -218,7 +233,7 @@ class _TotalWealthSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (totalValue == 0) {
-      return _EmptyDashboard();
+      return const _EmptyDashboard();
     }
     return Container(
       padding: const EdgeInsets.all(24),
@@ -290,6 +305,8 @@ class _TotalWealthSection extends StatelessWidget {
 }
 
 class _EmptyDashboard extends StatelessWidget {
+  const _EmptyDashboard();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -697,6 +714,133 @@ class _DashboardAssetRow extends StatelessWidget {
               Icons.chevron_right,
               color: AppColors.textMuted,
               size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioGoalsSection extends StatelessWidget {
+  const _PortfolioGoalsSection({
+    required this.totalValue,
+    required this.baseCurrency,
+  });
+
+  final double totalValue;
+  final String baseCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<GoalsCubit, GoalsState>(
+      builder: (context, state) {
+        final goals = state is GoalsLoaded
+            ? state.goals
+                .where((g) => g.type == GoalType.portfolio)
+                .toList()
+            : <dynamic>[];
+
+        if (goals.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: _AddGoalButton(
+              label: 'Dodaj cel portfela',
+              onTap: () => _openAddGoal(context),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Cele portfela',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _openAddGoal(context),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Dodaj cel'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      textStyle: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...goals.map(
+                (goal) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: GoalProgressCard(
+                    goal: goal,
+                    currentValue: totalValue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openAddGoal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider.value(
+        value: context.read<GoalsCubit>(),
+        child: AddGoalSheet(
+          goalType: GoalType.portfolio,
+          targetCurrency: baseCurrency,
+        ),
+      ),
+    );
+  }
+}
+
+class _AddGoalButton extends StatelessWidget {
+  const _AddGoalButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withAlpha(80),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.add_circle_outline, color: AppColors.primary, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

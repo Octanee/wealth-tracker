@@ -9,6 +9,7 @@ import 'features/auth/presentation/cubit/auth_cubit.dart';
 import 'features/assets/presentation/cubit/assets_cubit.dart';
 import 'features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import 'features/settings/presentation/cubit/settings_cubit.dart';
+import 'features/goals/presentation/cubit/goals_cubit.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -53,6 +54,9 @@ class WealthLensApp extends StatelessWidget {
             authRepository: sl.authRepository,
             analytics: sl.analyticsService,
           ),
+        ),
+        BlocProvider(
+          create: (_) => GoalsCubit(repository: sl.goalsRepository),
         ),
       ],
       child: Builder(

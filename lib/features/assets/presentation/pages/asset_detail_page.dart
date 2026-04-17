@@ -19,6 +19,11 @@ import '../../../../features/dashboard/domain/calculators/wealth_calculator.dart
 import '../../../../features/market_data/domain/entities/asset_valuation.dart';
 import '../../../../features/dashboard/presentation/widgets/portfolio_history_chart.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../features/goals/presentation/cubit/goals_cubit.dart';
+import '../../../../features/goals/presentation/cubit/goals_state.dart';
+import '../../../../features/goals/domain/entities/goal_type.dart';
+import '../../../../features/goals/presentation/widgets/goal_progress_card.dart';
+import '../../../../features/goals/presentation/widgets/add_goal_sheet.dart';
 
 class AssetDetailPage extends StatelessWidget {
   const AssetDetailPage({super.key, required this.asset});
@@ -37,6 +42,7 @@ class AssetDetailPage extends StatelessWidget {
         final authState = context.read<AuthCubit>().state;
         if (authState is AuthAuthenticated) {
           cubit.loadDetail(authState.user.uid, asset.id, asset);
+          context.read<GoalsCubit>().loadGoals(authState.user.uid);
         }
         return cubit;
       },
@@ -367,6 +373,9 @@ class _LoadedView extends StatelessWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
+        SliverToBoxAdapter(
+          child: _AssetGoalsSection(asset: asset),
+        ),
         if (state.entries.isEmpty)
           SliverFillRemaining(
             child: _EmptyEntries(
@@ -890,6 +899,131 @@ class _EmptyEntries extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _AssetGoalsSection extends StatelessWidget {
+  const _AssetGoalsSection({required this.asset});
+  final Asset asset;
+
+  double get _currentValue => asset.latestSnapshot?.value ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<GoalsCubit, GoalsState>(
+      builder: (context, state) {
+        final goals = state is GoalsLoaded
+            ? state.goals
+                .where((g) => g.type == GoalType.asset && g.assetId == asset.id)
+                .toList()
+            : <dynamic>[];
+
+        if (goals.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+            child: _GoalAddButton(
+              label: 'Dodaj cel aktywa',
+              onTap: () => _openAddGoal(context),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Cele aktywa',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _openAddGoal(context),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Dodaj cel'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      textStyle: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...goals.map(
+                (goal) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: GoalProgressCard(
+                    goal: goal,
+                    currentValue: _currentValue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openAddGoal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider.value(
+        value: context.read<GoalsCubit>(),
+        child: AddGoalSheet(
+          goalType: GoalType.asset,
+          targetCurrency: asset.currency,
+          assetId: asset.id,
+        ),
+      ),
+    );
+  }
+}
+
+class _GoalAddButton extends StatelessWidget {
+  const _GoalAddButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withAlpha(80),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.add_circle_outline,
+              color: AppColors.primary,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

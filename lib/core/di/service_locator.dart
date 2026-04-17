@@ -14,6 +14,8 @@ import '../../features/market_data/domain/repositories/exchange_rate_repository.
 import '../../features/market_data/domain/services/asset_valuation_service.dart';
 import '../../features/market_data/domain/services/gold_history_service.dart';
 import '../../features/market_data/domain/services/portfolio_valuation_service.dart';
+import '../../features/goals/data/repositories/goals_repository_impl.dart';
+import '../../features/goals/domain/repositories/goals_repository.dart';
 
 /// Simple service locator — replace with get_it if scale demands it.
 class ServiceLocator {
@@ -28,6 +30,7 @@ class ServiceLocator {
   late final AssetValuationService assetValuationService;
   late final GoldHistoryService goldHistoryService;
   late final PortfolioValuationService portfolioValuationService;
+  late final GoalsRepository goalsRepository;
 
   Future<void> setup() async {
     final firebaseAuth = FirebaseAuth.instance;
@@ -44,6 +47,7 @@ class ServiceLocator {
     );
 
     assetsRepository = AssetsRepositoryImpl(firestore: firestore);
+    goalsRepository = GoalsRepositoryImpl(firestore: firestore);
 
     exchangeRateRepository = ExchangeRateRepositoryImpl(
       apiClient: NbpApiClient(client: httpClient),

@@ -186,6 +186,38 @@ class _FakeExchangeRateRepository implements ExchangeRateRepository {
     };
   }
 
+  @override
+  Future<Map<DateTime, double>> getExchangeRateSeriesToPln({
+    required String currencyCode,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final code = currencyCode.toUpperCase();
+    if (code == 'PLN') {
+      final result = <DateTime, double>{};
+      var cursor = _normalize(startDate);
+      final end = _normalize(endDate);
+      while (!cursor.isAfter(end)) {
+        result[cursor] = 1.0;
+        cursor = cursor.add(const Duration(days: 1));
+      }
+      return result;
+    }
+    // Build a dense series from the fixed exchange rate map.
+    final codeToPln = exchangeRates[(code, 'PLN')];
+    final plnToCode = exchangeRates[('PLN', code)];
+    final rate = codeToPln ?? (plnToCode != null ? 1 / plnToCode : null);
+    if (rate == null) return {};
+    final result = <DateTime, double>{};
+    var cursor = _normalize(startDate);
+    final end = _normalize(endDate);
+    while (!cursor.isAfter(end)) {
+      result[cursor] = rate;
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return result;
+  }
+
   DateTime _normalize(DateTime date) =>
       DateTime.utc(date.year, date.month, date.day);
 }

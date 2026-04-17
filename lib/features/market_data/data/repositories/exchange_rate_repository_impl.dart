@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_constants.dart';
@@ -13,6 +15,10 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
 
   final NbpApiClient _apiClient;
   final SharedPreferences _preferences;
+
+  // In-memory cache for the lifetime of this instance — avoids repeated
+  // SharedPreferences reads for values that have already been fetched.
+  final Map<String, double> _memCache = {};
 
   @override
   Future<double?> convert({
@@ -44,8 +50,12 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
     }
 
     final cacheKey = _cacheKey('fx', '$from-$to', date);
+    final memHit = _memCache[cacheKey];
+    if (memHit != null) return memHit;
+
     final cached = _preferences.getDouble(cacheKey);
     if (cached != null) {
+      _memCache[cacheKey] = cached;
       return cached;
     }
 
@@ -55,7 +65,8 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
         toCurrency: to,
         date: date,
       );
-      _preferences.setDouble(cacheKey, rate);
+      _memCache[cacheKey] = rate;
+      unawaited(_preferences.setDouble(cacheKey, rate));
       return rate;
     } catch (_) {
       return cached;
@@ -65,14 +76,19 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
   @override
   Future<double?> getGoldPricePerGram({DateTime? date}) async {
     final cacheKey = _cacheKey('gold', 'pln-per-gram', date);
+    final memHit = _memCache[cacheKey];
+    if (memHit != null) return memHit;
+
     final cached = _preferences.getDouble(cacheKey);
     if (cached != null) {
+      _memCache[cacheKey] = cached;
       return cached;
     }
 
     try {
       final price = await _apiClient.getGoldPricePerGram(date: date);
-      _preferences.setDouble(cacheKey, price);
+      _memCache[cacheKey] = price;
+      unawaited(_preferences.setDouble(cacheKey, price));
       return price;
     } catch (_) {
       return cached;
@@ -94,10 +110,9 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
         endDate: end,
       );
       for (final entry in series.entries) {
-        _preferences.setDouble(
-          _cacheKey('gold', 'pln-per-gram', entry.key),
-          entry.value,
-        );
+        final key = _cacheKey('gold', 'pln-per-gram', entry.key);
+        _memCache[key] = entry.value;
+        unawaited(_preferences.setDouble(key, entry.value));
       }
       if (series.isNotEmpty) {
         return series;
@@ -140,6 +155,62 @@ class ExchangeRateRepositoryImpl implements ExchangeRateRepository {
         '${normalizedDate.month.toString().padLeft(2, '0')}-'
         '${normalizedDate.day.toString().padLeft(2, '0')}';
     return 'nbp.$prefix.$key.$datePart';
+  }
+
+  @override
+  Future<Map<DateTime, double>> getExchangeRateSeriesToPln({
+    required String currencyCode,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final code = currencyCode.toUpperCase();
+    final start = _normalizeDate(startDate);
+    final end = _normalizeDate(endDate);
+    if (start.isAfter(end)) return {};
+
+    try {
+      final series = await _apiClient.getMidRateSeriesToPln(
+        code,
+        startDate: start,
+        endDate: end,
+      );
+      for (final entry in series.entries) {
+        final key = _cacheKey('fx', '$code-PLN', entry.key);
+        _memCache[key] = entry.value;
+        unawaited(_preferences.setDouble(key, entry.value));
+      }
+      if (series.isNotEmpty) {
+        return series;
+      }
+    } catch (_) {
+      // Fall through to cached lookup.
+    }
+
+    return _readCachedFxSeries(code: code, start: start, end: end);
+  }
+
+  Map<DateTime, double> _readCachedFxSeries({
+    required String code,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final result = <DateTime, double>{};
+    var cursor = start;
+    while (!cursor.isAfter(end)) {
+      final key = _cacheKey('fx', '$code-PLN', cursor);
+      final memHit = _memCache[key];
+      if (memHit != null) {
+        result[cursor] = memHit;
+      } else {
+        final cached = _preferences.getDouble(key);
+        if (cached != null) {
+          _memCache[key] = cached;
+          result[cursor] = cached;
+        }
+      }
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return result;
   }
 
   DateTime _normalizeDate(DateTime date) =>
