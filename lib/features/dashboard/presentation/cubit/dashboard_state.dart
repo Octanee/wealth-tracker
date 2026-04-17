@@ -25,6 +25,7 @@ class DashboardLoaded extends DashboardState {
     required this.valuationsByAssetId,
     required this.allocationPercents,
     this.portfolioHistory,
+    this.goldHistory,
   });
 
   final List<Asset> assets;
@@ -34,11 +35,14 @@ class DashboardLoaded extends DashboardState {
   final Map<String, double> allocationPercents; // assetId → %
   /// null = history still loading; empty = no points yet
   final List<ChartPoint>? portfolioHistory;
+  final List<ChartPoint>? goldHistory;
 
   List<Asset> get assetsWithValue =>
       assets.where((a) => valuationsByAssetId.containsKey(a.id)).toList();
 
   bool get hasUnconvertedAssets => assetsWithValue.length != assets.length;
+
+  bool get hasGoldAssets => assets.any((asset) => asset.isGoldAsset);
 
   DashboardLoaded withHistory(List<ChartPoint> history) => DashboardLoaded(
     assets: assets,
@@ -47,6 +51,7 @@ class DashboardLoaded extends DashboardState {
     valuationsByAssetId: valuationsByAssetId,
     allocationPercents: allocationPercents,
     portfolioHistory: history,
+    goldHistory: goldHistory,
   );
 
   @override
@@ -57,6 +62,7 @@ class DashboardLoaded extends DashboardState {
     valuationsByAssetId,
     allocationPercents,
     portfolioHistory,
+    goldHistory,
   ];
 }
 

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/asset_entry.dart';
+import '../../../dashboard/domain/calculators/wealth_calculator.dart';
 
 abstract class AssetDetailState extends Equatable {
   const AssetDetailState();
@@ -17,9 +18,14 @@ class AssetDetailLoading extends AssetDetailState {
 }
 
 class AssetDetailLoaded extends AssetDetailState {
-  const AssetDetailLoaded({required this.asset, required this.entries});
+  const AssetDetailLoaded({
+    required this.asset,
+    required this.entries,
+    this.goldHistory = const <ChartPoint>[],
+  });
   final Asset asset;
   final List<AssetEntry> entries;
+  final List<ChartPoint> goldHistory;
 
   double? get latestValue => entries.isEmpty ? null : entries.first.value;
 
@@ -36,7 +42,7 @@ class AssetDetailLoaded extends AssetDetailState {
   }
 
   @override
-  List<Object?> get props => [asset, entries];
+  List<Object?> get props => [asset, entries, goldHistory];
 }
 
 class AssetDetailError extends AssetDetailState {

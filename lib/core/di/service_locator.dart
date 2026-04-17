@@ -12,6 +12,7 @@ import '../../features/market_data/data/datasources/nbp_api_client.dart';
 import '../../features/market_data/data/repositories/exchange_rate_repository_impl.dart';
 import '../../features/market_data/domain/repositories/exchange_rate_repository.dart';
 import '../../features/market_data/domain/services/asset_valuation_service.dart';
+import '../../features/market_data/domain/services/gold_history_service.dart';
 import '../../features/market_data/domain/services/portfolio_valuation_service.dart';
 
 /// Simple service locator — replace with get_it if scale demands it.
@@ -25,6 +26,7 @@ class ServiceLocator {
   late final AnalyticsService analyticsService;
   late final ExchangeRateRepository exchangeRateRepository;
   late final AssetValuationService assetValuationService;
+  late final GoldHistoryService goldHistoryService;
   late final PortfolioValuationService portfolioValuationService;
 
   Future<void> setup() async {
@@ -50,6 +52,10 @@ class ServiceLocator {
 
     assetValuationService = AssetValuationService(
       ratesRepository: exchangeRateRepository,
+    );
+
+    goldHistoryService = GoldHistoryService(
+      assetValuationService: assetValuationService,
     );
 
     portfolioValuationService = PortfolioValuationService(

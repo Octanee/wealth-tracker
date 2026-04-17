@@ -43,6 +43,9 @@ class Asset extends Equatable {
   MetalAssetConfig? get metalConfig =>
       config is MetalAssetConfig ? config as MetalAssetConfig : null;
 
+  bool get isGoldAsset =>
+      metalConfig?.metalType == PreciousMetalType.gold;
+
   Asset copyWith({
     String? name,
     AssetType? type,

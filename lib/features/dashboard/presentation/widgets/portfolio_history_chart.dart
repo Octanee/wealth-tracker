@@ -22,10 +22,12 @@ class PortfolioHistoryChart extends StatefulWidget {
     super.key,
     required this.points,
     required this.currency,
+    this.title = 'Historia portfela',
   });
 
   final List<ChartPoint> points;
   final String currency;
+  final String title;
 
   @override
   State<PortfolioHistoryChart> createState() => _PortfolioHistoryChartState();
@@ -81,7 +83,7 @@ class _PortfolioHistoryChartState extends State<PortfolioHistoryChart> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Historia portfela (${widget.currency})',
+                      '${widget.title} (${widget.currency})',
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 13,

@@ -17,6 +17,7 @@ import '../../../../features/auth/presentation/cubit/auth_cubit.dart';
 import '../../../../features/auth/presentation/cubit/auth_state.dart';
 import '../../../../features/dashboard/domain/calculators/wealth_calculator.dart';
 import '../../../../features/market_data/domain/entities/asset_valuation.dart';
+import '../../../../features/dashboard/presentation/widgets/portfolio_history_chart.dart';
 import '../../../../core/di/service_locator.dart';
 
 class AssetDetailPage extends StatelessWidget {
@@ -30,6 +31,7 @@ class AssetDetailPage extends StatelessWidget {
       create: (context) {
         final cubit = AssetDetailCubit(
           repository: ServiceLocator.instance.assetsRepository,
+          goldHistoryService: ServiceLocator.instance.goldHistoryService,
           analytics: ServiceLocator.instance.analyticsService,
         );
         final authState = context.read<AuthCubit>().state;
@@ -318,18 +320,28 @@ class _LoadedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasGoldChart = asset.isGoldAsset && state.goldHistory.isNotEmpty;
+
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: _HeaderCard(state: state, asset: asset),
         ),
-        if (state.entries.isNotEmpty && asset.type.allowsManualEntries) ...[
+        if (hasGoldChart)
           SliverToBoxAdapter(
-            child: _ChartSection(
-              entries: state.entries,
+            child: _GoldChartSection(
+              history: state.goldHistory,
               currency: asset.currency,
             ),
           ),
+        if (state.entries.isNotEmpty && asset.type.allowsManualEntries) ...[
+          if (!hasGoldChart)
+            SliverToBoxAdapter(
+              child: _ChartSection(
+                entries: state.entries,
+                currency: asset.currency,
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
@@ -578,6 +590,25 @@ class _ChartSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GoldChartSection extends StatelessWidget {
+  const _GoldChartSection({required this.history, required this.currency});
+
+  final List<ChartPoint> history;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: PortfolioHistoryChart(
+        points: history,
+        currency: currency,
+        title: 'Historia wartości złota',
       ),
     );
   }

@@ -44,6 +44,7 @@ class WealthLensApp extends StatelessWidget {
           create: (_) => DashboardCubit(
             repository: sl.assetsRepository,
             portfolioValuationService: sl.portfolioValuationService,
+            goldHistoryService: sl.goldHistoryService,
             analytics: sl.analyticsService,
           ),
         ),

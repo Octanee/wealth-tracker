@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
+import '../../../dashboard/domain/calculators/wealth_calculator.dart';
+import '../../../market_data/domain/services/gold_history_service.dart';
 import '../../domain/repositories/assets_repository.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/asset_entry.dart';
@@ -12,12 +14,15 @@ import 'asset_detail_state.dart';
 class AssetDetailCubit extends Cubit<AssetDetailState> {
   AssetDetailCubit({
     required AssetsRepository repository,
+      required GoldHistoryService goldHistoryService,
     required AnalyticsService analytics,
   }) : _repository = repository,
+      _goldHistoryService = goldHistoryService,
        _analytics = analytics,
        super(const AssetDetailInitial());
 
   final AssetsRepository _repository;
+    final GoldHistoryService _goldHistoryService;
   final AnalyticsService _analytics;
   StreamSubscription? _entriesSub;
   String? _userId;
@@ -30,11 +35,18 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
     _currentAsset = asset;
     emit(const AssetDetailLoading());
     _entriesSub?.cancel();
-    _entriesSub = _repository.watchEntries(userId, assetId).listen((entries) {
+    _entriesSub = _repository.watchEntries(userId, assetId).listen((entries) async {
       final sourceAsset = _currentAsset ?? asset;
       final syncedAsset = _syncSnapshots(sourceAsset, entries);
+      final goldHistory = await _loadGoldHistory(syncedAsset, entries);
       _currentAsset = syncedAsset;
-      emit(AssetDetailLoaded(asset: syncedAsset, entries: entries));
+      emit(
+        AssetDetailLoaded(
+          asset: syncedAsset,
+          entries: entries,
+          goldHistory: goldHistory,
+        ),
+      );
     }, onError: (e) => emit(AssetDetailError(e.toString())));
   }
 
@@ -74,8 +86,15 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
           .where((entry) => entry.id != entryId)
           .toList();
       final syncedAsset = _syncSnapshots(previousState.asset, updatedEntries);
+      final goldHistory = await _loadGoldHistory(syncedAsset, updatedEntries);
       _currentAsset = syncedAsset;
-      emit(AssetDetailLoaded(asset: syncedAsset, entries: updatedEntries));
+      emit(
+        AssetDetailLoaded(
+          asset: syncedAsset,
+          entries: updatedEntries,
+          goldHistory: goldHistory,
+        ),
+      );
     }
 
     try {
@@ -120,7 +139,14 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
     try {
       await _repository.updateAsset(_userId!, updated);
       _currentAsset = updated;
-      emit(AssetDetailLoaded(asset: updated, entries: current.entries));
+      final goldHistory = await _loadGoldHistory(updated, current.entries);
+      emit(
+        AssetDetailLoaded(
+          asset: updated,
+          entries: current.entries,
+          goldHistory: goldHistory,
+        ),
+      );
       return null;
     } catch (_) {
       return 'Nie udało się zapisać zmian aktywa.';
@@ -152,6 +178,21 @@ class AssetDetailCubit extends Cubit<AssetDetailState> {
     return asset.copyWith(
       latestSnapshot: latestSnapshot,
       previousSnapshot: previousSnapshot,
+    );
+  }
+
+  Future<List<ChartPoint>> _loadGoldHistory(
+    Asset asset,
+    List<AssetEntry> entries,
+  ) {
+    if (!asset.isGoldAsset) {
+      return Future.value(const <ChartPoint>[]);
+    }
+
+    return _goldHistoryService.buildAssetHistory(
+      asset: asset,
+      entries: entries,
+      outputCurrency: asset.currency,
     );
   }
 

@@ -140,6 +140,12 @@ class _DashboardContent extends StatelessWidget {
     return history;
   }
 
+  List<ChartPoint> get _goldHistory {
+    final history = state.goldHistory;
+    if (history == null || history.isEmpty) return const [];
+    return history;
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -173,6 +179,14 @@ class _DashboardContent extends StatelessWidget {
                 PortfolioHistoryChart(
                   points: _historyWithEnoughData,
                   currency: state.baseCurrency,
+                ),
+                const SizedBox(height: 20),
+              ],
+              if (_goldHistory.isNotEmpty) ...[
+                PortfolioHistoryChart(
+                  points: _goldHistory,
+                  currency: state.baseCurrency,
+                  title: 'Historia złota',
                 ),
                 const SizedBox(height: 20),
               ],

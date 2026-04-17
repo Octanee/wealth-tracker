@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/repositories/assets_repository.dart';
+import '../../../market_data/domain/services/gold_history_service.dart';
 import '../../../market_data/domain/services/portfolio_valuation_service.dart';
 import 'dashboard_state.dart';
 
@@ -10,14 +11,17 @@ class DashboardCubit extends Cubit<DashboardState> {
   DashboardCubit({
     required AssetsRepository repository,
     required PortfolioValuationService portfolioValuationService,
+    required GoldHistoryService goldHistoryService,
     required AnalyticsService analytics,
   }) : _repository = repository,
        _portfolioValuationService = portfolioValuationService,
+       _goldHistoryService = goldHistoryService,
        _analytics = analytics,
        super(const DashboardInitial());
 
   final AssetsRepository _repository;
   final PortfolioValuationService _portfolioValuationService;
+  final GoldHistoryService _goldHistoryService;
   final AnalyticsService _analytics;
   StreamSubscription? _sub;
   String? _userId;
@@ -63,6 +67,11 @@ class DashboardCubit extends Cubit<DashboardState> {
         baseCurrency: _baseCurrency!,
         entriesByAsset: entriesByAsset,
       );
+      final goldHistory = await _goldHistoryService.buildCombinedHistory(
+        assets: assets,
+        baseCurrency: _baseCurrency!,
+        entriesByAsset: entriesByAsset,
+      );
       if (version != _loadVersion) return;
 
       emit(
@@ -73,6 +82,7 @@ class DashboardCubit extends Cubit<DashboardState> {
           valuationsByAssetId: result.valuationsByAssetId,
           allocationPercents: result.allocationPercents,
           portfolioHistory: result.history,
+          goldHistory: goldHistory,
         ),
       );
       unawaited(_analytics.logDashboardViewed(assetsCount: assets.length));
